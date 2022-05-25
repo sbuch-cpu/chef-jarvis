@@ -49,7 +49,7 @@ class Vocabulary:
 
 
 class RecipesDataset(Dataset):
-    def __init__(self, json_file, root_dir, transform=None, freq_threshold=5):
+    def __init__(self, json_file, root_dir, transform=None, freq_threshold=2):
         df_dirty = pd.DataFrame(json.load(open(os.path.join(root_dir, json_file)))['data'])
         df = df_dirty[df_dirty['task'] == 'textual_cloze']
         df = df.drop(columns=['question_modality', 'task', 'qid', 'context_modality'])
@@ -57,12 +57,11 @@ class RecipesDataset(Dataset):
         self.df = df
         self.transform = transform
 
-        self.context = df['context']
-        self.choice_list = df['choice_list']
-        self.answer = df['answer']
-        self.question = df['question']
-        self.question_text = df['question_text']
-        print(df.columns)
+        self.context = df['context'].tolist()
+        self.choice_list = df['choice_list'].tolist()
+        self.answer = df['answer'].tolist()
+        self.question = df['question'].tolist()
+        self.question_text = df['question_text'].tolist()
 
         # Initialize a Vocabulary
         self.vocab = Vocabulary(freq_threshold)
@@ -78,7 +77,6 @@ class RecipesDataset(Dataset):
         answer = self.answer[index]
         question = self.question[index]
         question_text = self.question_text[index]
-
         # Numericalize
         numericalized_context = self.list_to_token(context)
         numericalized_choice_list = self.list_to_token(choice_list)
@@ -96,7 +94,7 @@ class RecipesDataset(Dataset):
             numericalized_item = [self.vocab.stoi["<SOS>"]]
             numericalized_item += self.vocab.numericalize(idx)
             numericalized_item.append(self.vocab.stoi["<EOS>"])
-            numericalized_list.append(numericalized_item)
+            numericalized_list.append(torch.tensor(numericalized_item))
         return numericalized_list
 
 
@@ -105,6 +103,8 @@ class MyCollate:
         self.pad_idx = pad_idx
 
     def __call__(self, batch):
+        target = [item[4] for item in batch]
+        target = pad_sequence(target, batch_first=False, padding_value=self.pad_idx)
         context = [item[0] for item in batch]
         context = [pad_sequence(i, batch_first=False, padding_value=self.pad_idx) for i in context]
         choice_list = [item[1] for item in batch]
@@ -113,8 +113,7 @@ class MyCollate:
         question_text = pad_sequence(question_text, batch_first=False, padding_value=self.pad_idx)
         question = [item[3] for item in batch]
         question = [pad_sequence(i, batch_first=False, padding_value=self.pad_idx) for i in question]
-        target = [item[4] for item in batch]
-        target = pad_sequence(target, batch_first=False, padding_value=self.pad_idx)
+
         return context, choice_list, question_text, question, target
 
 
@@ -128,7 +127,6 @@ def get_loader(
         pin_memory=True
 ):
     dataset = RecipesDataset(json_file, root_folder, transform=transform)
-
     pad_idx = dataset.vocab.stoi["<PAD>"]
 
     loader = DataLoader(
@@ -144,9 +142,8 @@ def get_loader(
 
 def main():
     dataloader = get_loader('training_data/recipes_qa', 'train.json', None)
-
-    for v in dataloader:
-        print(v)
+    for idx, val in enumerate(dataloader):
+        print(len(val))
 
 
 if __name__ == "__main__":
