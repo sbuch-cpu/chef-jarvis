@@ -2,7 +2,7 @@ import os
 import requests
 import json
 import numpy as np
-# os.mkdir('squad')
+os.mkdir('squad')
 url = "https://rajpurkar.github.io/SQuAD-explorer/dataset/"
 
 
