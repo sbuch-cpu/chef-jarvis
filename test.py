@@ -10,6 +10,7 @@ import time
 url = "https://rajpurkar.github.io/SQuAD-explorer/dataset/"
 tokenizer = DistilBertTokenizerFast.from_pretrained('distilbert-base-uncased')
 device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
+print(device)
 model = DistilBertForQuestionAnswering.from_pretrained('distilbert-base-uncased')
 
 
