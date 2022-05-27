@@ -1,15 +1,14 @@
-def distilBERT(question, text):
-    import torch
+import torch
+from transformers import AutoTokenizer, AutoModelForQuestionAnswering
+from scraping import recipe_scraper, flatten
 
-    from transformers import AutoTokenizer, AutoModelForQuestionAnswering
+tokenizer = AutoTokenizer.from_pretrained("distilbert-base-uncased-distilled-squad")
+model = AutoModelForQuestionAnswering.from_pretrained("distilbert-base-uncased-distilled-squad")
 
-    tokenizer = AutoTokenizer.from_pretrained("distilbert-base-uncased-distilled-squad")
 
-    model = AutoModelForQuestionAnswering.from_pretrained("distilbert-base-uncased-distilled-squad")
+def ask_distilBERT(question, context):
 
-    # question, text = "Who was Jim Henson?", "Jim Henson was a nice puppet"
-
-    inputs = tokenizer(question, text, return_tensors="pt")
+    inputs = tokenizer(question, context, return_tensors="pt")
 
     with torch.no_grad():
         outputs = model(**inputs)
@@ -22,7 +21,11 @@ def distilBERT(question, text):
 
 
 def main():
-    distilBERT("Who was Jim Henson?", "Jim Henson was a nice puppet")
+    ingredients, recipe = recipe_scraper('https://www.foodnetwork.com/recipes/stuffed-green-peppers-with-tomato-sauce-recipe-1910765')
+    ingredients = '. '.join(ingredients)
+    print(ingredients)
+    ask_distilBERT('How much onion', ingredients)
+
 
 if __name__ == "__main__":
     main()
