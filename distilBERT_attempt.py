@@ -1,6 +1,6 @@
 import torch
 from transformers import AutoTokenizer, AutoModelForQuestionAnswering
-from scraping import recipe_scraper, flatten
+from scraping import recipe_scraper
 
 tokenizer = AutoTokenizer.from_pretrained("distilbert-base-uncased-distilled-squad")
 model = AutoModelForQuestionAnswering.from_pretrained("distilbert-base-uncased-distilled-squad")
@@ -23,6 +23,7 @@ def ask_distilBERT(question, context):
 def main():
     ingredients, recipe = recipe_scraper('https://www.foodnetwork.com/recipes/stuffed-green-peppers-with-tomato-sauce-recipe-1910765')
     ingredients = '. '.join(ingredients)
+    recipe = '. '.join(recipe)
     print(ingredients)
     ask_distilBERT('How much onion', ingredients)
 

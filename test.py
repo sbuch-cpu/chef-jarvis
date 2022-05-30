@@ -7,7 +7,6 @@ from tqdm import tqdm
 import time
 
 # os.mkdir('squad')
-url = "https://rajpurkar.github.io/SQuAD-explorer/dataset/"
 tokenizer = DistilBertTokenizerFast.from_pretrained('distilbert-base-uncased')
 device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
 print(device)
@@ -15,27 +14,27 @@ model = DistilBertForQuestionAnswering.from_pretrained('distilbert-base-uncased'
 
 
 def main():
-    files = ['train-v2.0.json', 'dev-v2.0.json']
-    for file in files:
-        res = requests.get(f'{url}{file}')
-        with open(f'squad/{file}', 'wb') as f:
-            for chunk in res.iter_content(chunk_size=4):
-                f.write(chunk)
-    train_contexts, train_questions, train_answers = read_squad(f'squad/{files[0]}')
-    val_contexts, val_questions, val_answers = read_squad(f'squad/{files[1]}')
+    files = ['train.json', 'val.json', 'test.json']
+    train_contexts, train_questions, train_answers = read_squad(f'training_data/recipes_qa/{files[0]}')
+    val_contexts, val_questions, val_answers = read_squad(f'training_data/recipes_qa/{files[1]}')
+    test_contexts, test_questions, test_answers = read_squad(f'training_data/recipes_qa/{files[2]}')
 
     train_answers = add_end_idx(train_answers, train_contexts)
     val_answers = add_end_idx(val_answers, val_contexts)
+    test_answers = add_end_idx(test_answers, test_contexts)
 
     # Tokenize/Encode
     train_encodings = tokenizer(train_contexts, train_questions, truncation=True, padding=True)
     val_encodings = tokenizer(val_contexts, val_questions, truncation=True, padding=True)
+    test_encodings = tokenizer(test_contexts, test_questions, truncation=True, padding=True)
 
     train_encodings = add_token_positions(train_encodings, train_answers)
     val_encodings = add_token_positions(val_encodings, val_answers)
+    test_encodings = add_token_positions(test_encodings, test_answers)
 
     train_dataset = SquadDataset(train_encodings)
     val_dataset = SquadDataset(val_encodings)
+    test_dataset = SquadDataset(test_encodings)
     start = time.time()
     print("###############  STARTING TRAINING  #####################")
 

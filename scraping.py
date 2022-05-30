@@ -6,11 +6,58 @@ from anyascii import anyascii
 
 
 def recipe_scraper(url):
-    ingredients = None
-    recipe = None
+    """
+    Function to retrieve the instructions and ingredients from a recipe webpage given a url.
+
+    :param url: string of the url of a website a recipe.
+    :type url: str
+    :return: A tuple containing the list of ingredients and the list of recipe instructions
+    :rtype: tuple
+    """
+
+    # Get the HTML code from the webpage and pass it into BeautifulSoup
     r = requests.get(url)
     soup = BeautifulSoup(r.text, features="html.parser")
-    # RECIPE METHOD
+
+    # First extraction method (From JSON object)
+    ingredients, recipe = recipe_from_json(soup)
+
+    # Second extraction method (From HTML)
+    if not ingredients or not recipe:
+        ingredients, recipe = recipe_from_html(soup)
+
+    # If neither extraction method works then raise and exception and error out
+    if not ingredients or not recipe:
+        print(ingredients, recipe)
+        raise Exception('This webpage format is not supported')
+
+    # If its a string, hopefully the items are broken up into list items to separate strings
+    recipe = break_string(recipe, '</li><li>')  # Break into list on end and starting list item tags
+    ingredients = break_string(ingredients, '</li><li>')  # Break into list on end and starting list item tags
+
+    # Clean each item in both the recipe and ingredients lists
+    recipe = [clean_string(step) for step in recipe]
+    ingredients = [clean_string(ingredient) for ingredient in ingredients]
+
+    return ingredients, recipe
+
+
+def break_string(string, delimiter):
+    """
+    Function to break a string into a list based on a given delimiter.
+    :param string: String to be split
+    :type string: str
+    :param delimiter: Delimiter on which
+    :type delimiter: str
+    :return:
+    :rtype:
+    """
+    if isinstance(string, str):
+        string = string.split(delimiter)
+    return string
+
+
+def recipe_from_json(soup, ingredients=None, recipe=None):
     script_list = soup.find_all("script")
     json_scripts = []
     for script in script_list:
@@ -22,7 +69,6 @@ def recipe_scraper(url):
         except json.decoder.JSONDecodeError:
             continue
         json_scripts.append(recipe_json)
-    # print(json_scripts)
     json_scripts = flatten(json_scripts)
 
     for script in json_scripts:
@@ -39,54 +85,47 @@ def recipe_scraper(url):
                     for r in recipe:
                         recipe_list.append(pull_from_dict(r, ['text'])[0])
                     recipe = recipe_list
-
-    if not ingredients or not recipe:
-        # for i in ['image', 'span', 'footer', 'nav', 'button', 'option', 'noscript', 'script', 'iframe', 'form',
-        #           'path', 'svg', 'aside', 'source', 'img', 'picture', 'ui-promo', 'style']:
-        #     for s in soup.select(i):
-        #         s.extract()
-        for x in soup.find_all():
-            # fetching text from tag and remove whitespaces
-            if len(x.get_text(strip=True)) == 0:
-                # Remove empty tag
-                x.extract()
-        print(soup.body.prettify())
-        recipe_keywords = ['Directions', 'Method', 'Steps', 'To Prepare', 'Instructions']
-        ingredients_keywords = ['Ingredients', 'Ingredient']
-        header_tags = ['h1', 'h2', 'h3', 'h4', 'h5', 'b']
-
-        for header in header_tags:
-            tags = soup.body.find_all(header)
-            for tag in tags:
-                if not recipe:
-                    recipe = list_keyword_scraping(tag, recipe_keywords)
-                if not ingredients:
-                    ingredients = list_keyword_scraping(tag, ingredients_keywords)
-
-    if not ingredients or not recipe:
-        print(ingredients, recipe)
-        raise Exception('This recipe format is not supported')
-    if isinstance(recipe, str):
-        recipe = recipe.split('</li><li>')
-
-    ingredients = clean_list(ingredients)
-    recipe = clean_list(recipe)
-
     return ingredients, recipe
 
 
-def clean_list(dirty_list):
-    # dirty_list = [i.encode("ascii", "ignore").decode() for i in dirty_list]  # remove non-ascii characters
-    dirty_list = [anyascii(i) for i in dirty_list]  # convert non-ascii characters
-    dirty_list = [re.sub("[<].*?[>]", " ", i).strip() for i in dirty_list]  # remove any remaining html tags
-    dirty_list = [re.sub("\n", " ", i).strip() for i in dirty_list]  # remove line breaks
-    dirty_list = [' '.join(i.split()) for i in dirty_list]  # remove any multiple spaces ie '    ' becomes ' '
-    dirty_list = [i.replace(" ,", ",") for i in dirty_list]  # remove whitespace before commas
-    dirty_list = [i.replace(" .", ".") for i in dirty_list]  # remove whitespace before periods
-    dirty_list = [i.replace(" !", "!") for i in dirty_list]  # remove whitespace before exclamation points
-    dirty_list = [i.replace(" ?", "?") for i in dirty_list]  # remove whitespace before question marks
-    cleaned_list = [re.sub("\xa0", " ", i).strip() for i in dirty_list]
-    return cleaned_list
+def recipe_from_html(soup, ingredients=None, recipe=None):
+    # for i in ['image', 'footer', 'nav', 'button', 'option', 'noscript', 'script', 'iframe', 'form',
+    #           'path', 'svg', 'aside', 'source', 'img', 'picture', 'ui-promo', 'style']:
+    #     for s in soup.select(i):
+    #         s.extract()
+    for x in soup.find_all():
+        # fetching text from tag and remove whitespaces
+        if len(x.get_text(strip=True)) == 0:
+            # Remove empty tag
+            x.extract()
+    recipe_keywords = ['Directions', 'Method', 'Steps', 'To Prepare', 'Instructions']
+    ingredients_keywords = ['Ingredients', 'Ingredient']
+    header_tags = ['h1', 'h2', 'h3', 'h4', 'h5', 'b']
+
+    for header in header_tags:
+        tags = soup.body.find_all(header)
+        for tag in tags:
+            if not recipe:
+                recipe = list_keyword_scraping(tag, recipe_keywords)
+            if not ingredients:
+                ingredients = list_keyword_scraping(tag, ingredients_keywords)
+    return ingredients, recipe
+
+
+def clean_string(dirty_string):
+    # dirty_string = dirty_string.encode("ascii", "ignore").decode()  # remove non-ascii characters
+    dirty_string = anyascii(dirty_string)  # convert non-ascii characters
+    dirty_string = re.sub("[<].*?[>]", " ", dirty_string).strip()  # remove any remaining html tags
+    dirty_string = re.sub("\n", " ", dirty_string).strip()  # remove line breaks
+    dirty_string = re.sub("\xa0", " ", dirty_string).strip()  # remove specific unwanted characters
+    dirty_string = ' '.join(dirty_string.split())  # remove any multiple spaces ie '    ' becomes ' '
+    dirty_string = dirty_string.replace(" ,", ",")  # remove whitespace before commas
+    dirty_string = dirty_string.replace(" .", ".")  # remove whitespace before periods
+    dirty_string = dirty_string.replace(" !", "!")  # remove whitespace before exclamation points
+    dirty_string = dirty_string.replace(" ?", "?")  # remove whitespace before question marks
+    cleaned_string = dirty_string  # for clarity
+    return cleaned_string
+
 
 def list_keyword_scraping(tag, keywords_list):
     itemized_list = None
