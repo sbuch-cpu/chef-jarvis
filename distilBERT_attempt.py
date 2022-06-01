@@ -24,8 +24,7 @@ def main():
     ingredients, recipe = recipe_scraper('https://www.foodnetwork.com/recipes/stuffed-green-peppers-with-tomato-sauce-recipe-1910765')
     ingredients = '. '.join(ingredients)
     recipe = '. '.join(recipe)
-    print(ingredients)
-    ask_distilBERT('How much onion', ingredients)
+    ask_distilBERT('How much onion', recipe)
 
 
 if __name__ == "__main__":

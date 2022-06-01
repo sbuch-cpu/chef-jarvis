@@ -77,7 +77,7 @@ def recipe_from_json(soup, ingredients=None, recipe=None):
     :param recipe: Current list of recipe steps, None by default
     :type recipe: list[str]
     :return: List of Ingredients and list of recipe steps if any where found, otherwise returns None and None.
-    :rtype: (list[str], list[str]) or (None, None)
+    :rtype: (list[str], list[str]) or (None, None) or (str, str)
     """
 
     # Create a list of all the script tags in the given HTML code
@@ -110,8 +110,8 @@ def recipe_from_json(soup, ingredients=None, recipe=None):
             recipe = script['recipeInstructions']
 
             # Check to make sure that the list is a list of text not a list of dictionaries, and fix if needed
-            ingredients = check_for_dict(ingredients, ['text'])
-            recipe = check_for_dict(recipe, ['text'])
+            ingredients = parse_from_JSON(ingredients, ['text'])
+            recipe = parse_from_JSON(recipe, ['text'])
 
     return ingredients, recipe
 
@@ -149,11 +149,11 @@ def recipe_from_html(soup, ingredients=None, recipe=None):
         for tag in tags:
             # If the recipe has not been found check to see if this tag contains the header for the recipe
             if not recipe:
-                recipe = list_keyword_scraping(tag, recipe_keywords)
+                recipe = list_from_heading_keyword(tag, recipe_keywords)
 
             # If the recipe has not been found check to see if this tag contains the header for the recipe
             if not ingredients:
-                ingredients = list_keyword_scraping(tag, ingredients_keywords)
+                ingredients = list_from_heading_keyword(tag, ingredients_keywords)
     return ingredients, recipe
 
 
@@ -181,6 +181,7 @@ def clean_string(dirty_string, regex_remove=None, remove_nonascii=False):
         dirty_string = anyascii(dirty_string)  # convert non-ascii characters
     for i in regex_remove:
         dirty_string = re.sub(i, " ", dirty_string).strip()  # remove any specific strings
+
     dirty_string = ' '.join(dirty_string.split())  # remove any multiple spaces i.e. '    ' becomes ' '
     dirty_string = dirty_string.replace(" ,", ",")  # remove whitespace before commas
     dirty_string = dirty_string.replace(" .", ".")  # remove whitespace before periods
@@ -190,66 +191,121 @@ def clean_string(dirty_string, regex_remove=None, remove_nonascii=False):
     return cleaned_string
 
 
-def list_keyword_scraping(tag, keywords_list):
+def list_from_heading_keyword(tag, keywords_list, line_threshold=200):
     """
     Function to pull a list below a heading from HTML source code. First the given heading tag is checked to see if it
     matches any of the keyword known to be in the heading preceding the desired list. If the tag contains one of the
-    key words then the next list item <li> tag is found. If that list is within 200 lines of
+    key words then the next list item <li> tag is found. If that list is within the line threshold of the tag being
+    examined then it is assumed that it is the list being searched for. If the next list is further than the line
+    threshold then it is assumed that the list is actually broken up into separate paragraphs rather than list items.
+    In that case then the next <p> tag is searched for and all <p> tags in that level of HTML are assumed to be list
+    items.
 
-    :param tag:
-    :type tag:
-    :param keywords_list:
-    :type keywords_list:
-    :return:
-    :rtype:
+    :param tag: Tag being evaluated to check if it is the header of a list.
+    :type tag: BeautifulSoup
+    :param keywords_list: List of keywords expected to appear in the header of the desired list
+    :type keywords_list: list[str]
+    :param line_threshold: Distance between the header tag and the first list item for them to be presumed correlated
+    :type line_threshold: int
+    :return: List of items in the desired list
+    :rtype: list[str] or None
     """
+    # Initialize the list as None so that None will be returned if the tag is not the header of the desired list
     itemized_list = None
+
+    # Check each of the possible keywords in the header
     for keyword in keywords_list:
+        # remove any formatting that would prevent a match.
+        # checking for 'in' rather than '==' so that keyword: is a match.
         if keyword.strip().lower() in tag.text.strip().lower():
+            # Find the next HTML list after the list header
             list_item = tag.find_next('li')
-            if list_item and (list_item.sourceline - tag.sourceline) < 200:
-                desired_list = list_item.parent
-                desired_list = desired_list.find_all('li')
-                itemized_list = [item.text for item in desired_list]
-            else:
-                first_item = tag.find_next('p')
+
+            # Check to see if there is a list item and if it are close enough to the header
+            if list_item and (list_item.sourceline - tag.sourceline) < line_threshold:
+                desired_list = list_item.parent  # get the element containing the list
+                desired_list = desired_list.find_all('li')  # get a list of all list items
+                itemized_list = [item.text for item in desired_list]  # get the text from each list item
+
+            else: # If a list is not found close enough to the header than the list is probably a series of paragraphs
+                first_item = tag.find_next('p')  # find the next paragraph item
                 itemized_list = [first_item.text]
-                steps = first_item.find_next_siblings("p")
+                steps = first_item.find_next_siblings("p")  # find all paragraphs on that level
                 for step in steps:
-                    itemized_list.append(step.text)
-            if itemized_list:
+                    itemized_list.append(step.text)  # get the text of each list item
+
+            if itemized_list:  # if the list has been found no need to continue iterating through
                 break
     return itemized_list
 
 
 def flatten(x):
+    """
+    Function to flatten lists but leave dictionaries in tact.
+
+    :param x: List of lists, dictionaries, and strings that needs to be flattened
+    :type x: list[Any]
+    :return: Flattened list
+    :rtype: list[Any]
+    """
     result = []
+    # Function to iterate through the list
     for item in x:
+        # Flatten any lists or tuples that are found
         if isinstance(item, (list, tuple)):
             result.extend(flatten(item))
         else:
+            # append any strings or dicts that are found
             result.append(item)
     return result
 
 
-def check_for_dict(list_of_dict, keys):
-    # print(list_of_dict)
-    if hasattr(list_of_dict, '__iter__') and not isinstance(list_of_dict, str):
-        if isinstance(list_of_dict, dict):
-            list_of_dict = pull_from_dict(list_of_dict, keys)[0]
+def parse_from_JSON(item_from_json, keys):
+    """
+    Function to check if the item pulled from a JSON object is a string, a dictionary, a list of strings, or a list of
+    dictionaries and handle accordingly. in the case that some elements contain dictionaries, possible keys to retrieve
+    the desired text is passed through the keys variable.
+
+    :param item_from_json: Item pulled from a JSON object that will be handled to retrieve strings
+    :type item_from_json: list[Any]
+    :param keys: List of keys used to try to retrieve desired text if a dictionary is found
+    :type keys: list[str]
+    :return: Desired text as a string or a list of strings
+    :rtype: list[str] or str
+    """
+    # Check to see if the item pulled from json is iterable and making sure that its not just a string
+    if hasattr(item_from_json, '__iter__') and not isinstance(item_from_json, str):
+        # If its a dictionary then just pull the text out
+        if isinstance(item_from_json, dict):
+            # the pull_from_dict function returns a list of strings (if multiple elements were found from the keys)
+            parsed_from_json = pull_from_dict(item_from_json, keys)
+
+            # if only one element was found then a string should be returned rather than a one element long list
+            # because the desired list is likely contained within that string
+            if len(parsed_from_json) == 1:
+                parsed_from_json = parsed_from_json[0]
+
         else:
-            cleaned_list = []
-            for i in list_of_dict:
-                # print(i)
+            # If the item retreived from json is a list or tuple then iterate over the items in that list and try to
+            # pull items out of the dictionary (if they are strings then pull_from_dict just returns the string)
+            parsed_from_json = []
+            for i in item_from_json:
                 list_of_items = pull_from_dict(i, keys)
-                for x in list_of_items:
-                    cleaned_list.append(x)
-            list_of_dict = cleaned_list
-            # print(list_of_dict)
-    return list_of_dict
+                parsed_from_json.extend(list_of_items)
+
+    return parsed_from_json
 
 
 def pull_from_dict(obj, keys):
+    """
+
+    :param obj:
+    :type obj:
+    :param keys:
+    :type keys:
+    :return:
+    :rtype:
+    """
     recipe = []
     if isinstance(obj, dict):
         valid_keys = [k for k in keys if k in obj.keys()]
@@ -270,6 +326,4 @@ def pull_from_dict(obj, keys):
 if __name__ == "__main__":
     # print(recipe_scraper('https://www.bingingwithbabish.com/recipes/2017/1/18/kevinschili?rq=kevin'))
     # print(recipe_scraper('https://www.jamieoliver.com/recipes/eggs-recipes/hollandaise-sauce/'))
-
-    # STILL NEED TO WORK ON CASES LIKE THIS ONE
     print(recipe_scraper('https://www.foodnetwork.com/recipes/stuffed-green-peppers-with-tomato-sauce-recipe-1910765'))
