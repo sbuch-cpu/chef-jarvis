@@ -66,7 +66,7 @@ def main():
             loop.set_postfix(loss=loss.item())
 
     # SAVE THE MODEL
-    model_path = 'distilbert_custom'
+    model_path = '../distilbert_custom'
     model.save_pretrained(model_path)
     tokenizer.save_pretrained(model_path)
     end = time.time()

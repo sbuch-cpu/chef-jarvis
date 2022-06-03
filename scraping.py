@@ -227,7 +227,7 @@ def list_from_heading_keyword(tag, keywords_list, line_threshold=200):
                 desired_list = desired_list.find_all('li')  # get a list of all list items
                 itemized_list = [item.text for item in desired_list]  # get the text from each list item
 
-            else: # If a list is not found close enough to the header than the list is probably a series of paragraphs
+            else:  # If a list is not found close enough to the header than the list is probably a series of paragraphs
                 first_item = tag.find_next('p')  # find the next paragraph item
                 itemized_list = [first_item.text]
                 steps = first_item.find_next_siblings("p")  # find all paragraphs on that level
@@ -286,13 +286,14 @@ def parse_from_JSON(item_from_json, keys):
                 parsed_from_json = parsed_from_json[0]
 
         else:
-            # If the item retreived from json is a list or tuple then iterate over the items in that list and try to
+            # If the item retrieved from json is a list or tuple then iterate over the items in that list and try to
             # pull items out of the dictionary (if they are strings then pull_from_dict just returns the string)
             parsed_from_json = []
             for i in item_from_json:
                 list_of_items = pull_from_dict(i, keys)
                 parsed_from_json.extend(list_of_items)
-
+    else:
+        parsed_from_json = item_from_json
     return parsed_from_json
 
 
@@ -326,5 +327,5 @@ def pull_from_dict(obj, keys):
 
 if __name__ == "__main__":
     # print(recipe_scraper('https://www.bingingwithbabish.com/recipes/2017/1/18/kevinschili?rq=kevin'))
-    # print(recipe_scraper('https://www.jamieoliver.com/recipes/eggs-recipes/hollandaise-sauce/'))
-    print(recipe_scraper('https://www.foodnetwork.com/recipes/stuffed-green-peppers-with-tomato-sauce-recipe-1910765'))
+    print(recipe_scraper('https://www.jamieoliver.com/recipes/eggs-recipes/hollandaise-sauce/'))
+    # print(recipe_scraper('https://www.foodnetwork.com/recipes/stuffed-green-peppers-with-tomato-sauce-recipe-1910765'))
