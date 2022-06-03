@@ -1,27 +1,38 @@
+
 import torch
-from transformers import Speech2Text2Processor, SpeechEncoderDecoderModel
-from datasets import load_dataset
-import soundfile as sf
+from transformers import Wav2Vec2ProcessorWithLM, Wav2Vec2ForCTC
+import sounddevice as sd
+import noisereduce as nr
 
-model = SpeechEncoderDecoderModel.from_pretrained("facebook/s2t-wav2vec2-large-en-de")
-processor = Speech2Text2Processor.from_pretrained("facebook/s2t-wav2vec2-large-en-de")
+hugging_face_mode = "patrickvonplaten/wav2vec2-base-100h-with-lm"
 
-
-def map_to_array(batch):
-    speech, _ = sf.read(batch["file"])
-    batch["speech"] = speech
-    return batch
+model = Wav2Vec2ForCTC.from_pretrained(hugging_face_mode)
+processor = Wav2Vec2ProcessorWithLM.from_pretrained(hugging_face_mode)
 
 
-def main():
-    ds = load_dataset("hf-internal-testing/librispeech_asr_dummy", "clean", split="validation")
-    ds = ds.map(map_to_array)
-    inputs = processor(ds["speech"][0], sampling_rate=16_000, return_tensors="pt")
-    generated_ids = model.generate(inputs=inputs["input_values"], attention_mask=inputs["attention_mask"])
+def speech_to_audio():
+    fs = 16000  # Sample rate
+    seconds = 7  # Duration of recording
 
-    transcription = processor.batch_decode(generated_ids)
-    print(transcription)
+    myrecording = sd.rec(int(seconds * fs), samplerate=fs, channels=1)
+    print('recording')
+    sd.wait()  # Wait until recording is finished
+    print('done recording')
+    myrecording = myrecording.flatten()
+    myrecording = nr.reduce_noise(y=myrecording, sr=fs)
+    audio_to_transcript(myrecording, sampling_rate=fs)
+
+
+def audio_to_transcript(audio, sampling_rate=16000):
+    inputs = processor(audio, sampling_rate=sampling_rate, return_tensors="pt")
+    with torch.no_grad():
+        logits = model(**inputs).logits
+
+    # generated_ids = model.generate(inputs=inputs["input_values"])
+
+    transcription = processor.batch_decode(logits.numpy()).text
+    print(transcription[0].lower())
 
 
 if __name__ == "__main__":
-    main()
+    speech_to_audio()
