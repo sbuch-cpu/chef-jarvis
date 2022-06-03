@@ -1,11 +1,9 @@
-opencv-python
-numpy~=1.22.3
 requests~=2.27.1
 torch~=1.11.0
 transformers~=4.19.2
 tqdm~=4.64.0
-pandas~=1.4.2
-spacy~=3.3.0
-torchvision~=0.12.0
-beautifulsoup4~=4.11.1
+sounddevice~=0.4.4
+noisereduce~=2.0.1
+gTTS~=2.2.4
 anyascii~=0.3.1
+beautifulsoup4~=4.11.1
