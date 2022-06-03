@@ -9,9 +9,9 @@ def recipe_scraper(url):
     """
     Function to retrieve the instructions and ingredients from a recipe webpage given a url.
 
-    :param url: string of the url of a website a recipe.
+    :param url: string of the url of a website with a recipe.
     :type url: str
-    :return: A tuple containing the list of ingredients and the list of recipe instructions
+    :return: a tuple containing the list of ingredients and the list of recipe instructions
     :rtype: tuple
     """
 
