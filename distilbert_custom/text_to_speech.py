@@ -9,7 +9,9 @@ def gTTS_model(myText):
     output = gTTS(text=myText, lang=language, slow=False)
 
     output.save("output.mp3")
+
     os.system("afplay output.mp3")
+
     os.remove("output.mp3")
 
 

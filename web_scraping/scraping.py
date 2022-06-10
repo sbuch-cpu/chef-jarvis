@@ -7,40 +7,55 @@ from anyascii import anyascii
 
 def recipe_scraper(url):
     """
-    Function to retrieve the instructions and ingredients from a recipe webpage given a url.
+    Function to retrieve the instructions and ingredients from a instructions webpage given a url.
 
-    :param url: string of the url of a website a recipe.
+    :param url: string of the url of a website a instructions.
     :type url: str
-    :return: A tuple containing the list of ingredients and the list of recipe instructions
-    :rtype: (list[str], list[str])
+    :return: A tuple containing the list of ingredients and the list of instructions instructions
+    :rtype: dict
     """
 
     # Get the HTML code from the webpage and pass it into BeautifulSoup
+
     r = requests.get(url)
     soup = BeautifulSoup(r.text, features="html.parser")
+    title = ""
+    potential_title_spots = ['title', 'h1']
+    for tag in potential_title_spots:
+        title_list = soup.find_all(tag)
+        if title_list:
+            title = title_list[0].text
+            title = clean_string(title)
+            break
+    # First extraction instructions (From JSON object)
+    # This instructions is first because it is less error prone than pulling from HTML
+    ingredients, instructions = recipe_from_json(soup)
 
-    # First extraction method (From JSON object)
-    # This method is first because it is less error prone than pulling from HTML
-    ingredients, recipe = recipe_from_json(soup)
+    # Second extraction instructions (From HTML)
+    if not ingredients or not instructions:
+        ingredients, instructions = recipe_from_html(soup)
 
-    # Second extraction method (From HTML)
-    if not ingredients or not recipe:
-        ingredients, recipe = recipe_from_html(soup)
-
-    # If neither extraction method works then raise and exception and error out
-    if not ingredients or not recipe:
-        print(ingredients, recipe)
+    # If neither extraction instructions works then raise and exception and error out
+    if not ingredients or not instructions:
+        print(ingredients, instructions)
         raise Exception('This webpage format is not supported')
 
     # If its a string, hopefully the items are broken up into list items to separate strings
-    recipe = break_string(recipe, '</li><li>')  # Break into list on end and starting list item tags
+    instructions = break_string(instructions, '</li><li>')  # Break into list on end and starting list item tags
     ingredients = break_string(ingredients, '</li><li>')  # Break into list on end and starting list item tags
 
-    # Clean each item in both the recipe and ingredients lists
-    recipe = [clean_string(step, regex_remove=["[<].*?[>]", "\n", "\xa0"]) for step in recipe]
-    ingredients = [clean_string(ingredient, regex_remove=["[<].*?[>]", "\n", "\xa0"]) for ingredient in ingredients]
+    # Clean each item in both the instructions and ingredients lists
+    instructions = [clean_string(step) for step in instructions]
+    ingredients = [clean_string(ingredient) for ingredient in ingredients]
 
-    return ingredients, recipe
+    recipe = {
+        'title': title,
+        'ingredients': ingredients,
+        'instructions': instructions,
+        'url': url
+    }
+
+    return recipe
 
 
 def break_string(string, delimiter):
@@ -174,7 +189,7 @@ def clean_string(dirty_string, regex_remove=None, remove_nonascii=False):
     """
     # Written like this to avoid regex_remove being mutable
     if regex_remove is None:
-        regex_remove = []
+        regex_remove = ["[<].*?[>]", "\n", "\xa0", "&nbsp;"]
     if remove_nonascii:
         dirty_string = dirty_string.encode("ascii", "ignore").decode()  # remove non-ascii characters
     else:
@@ -313,7 +328,6 @@ def pull_from_dict(obj, keys):
         valid_keys = [k for k in keys if k in obj.keys()]
         if valid_keys:
             for k in valid_keys:
-                print(obj[k])
                 recipe.append(obj[k])
         else:
             print('Key not found ...')
@@ -326,6 +340,9 @@ def pull_from_dict(obj, keys):
 
 
 if __name__ == "__main__":
-    # print(recipe_scraper('https://www.bingingwithbabish.com/recipes/2017/1/18/kevinschili?rq=kevin'))
-    print(recipe_scraper('https://www.jamieoliver.com/recipes/eggs-recipes/hollandaise-sauce/'))
+    print(recipe_scraper('https://www.bingingwithbabish.com/recipes/2017/1/18/kevinschili?rq=kevin'))
+    # print(recipe_scraper('https://tasty.co/recipe/sweet-potato-and-black-bean-burritos'))
+    # print(recipe_scraper('https://cooking.nytimes.com/recipes/1023190-spaghetti-aglio-e-olio-e-fried-shallot?action=click&module=Public%20Recipebox&region=my-recipes&pgType=recipebox&rank=1'))
+    # print(recipe_scraper('https://www.jamieoliver.com/recipes/eggs-recipes/hollandaise-sauce/'))
     # print(recipe_scraper('https://www.foodnetwork.com/recipes/stuffed-green-peppers-with-tomato-sauce-recipe-1910765'))
+    # print(recipe_scraper('https://www.connoisseurusveg.com/baked-vegan-samosas/'))
