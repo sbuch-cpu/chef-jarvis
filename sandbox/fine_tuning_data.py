@@ -65,7 +65,6 @@ def full_ingredient_list_question_generation(tokenized_recipe, json_formatted_da
 
 
 def get_specific_ingredient_question(tokenized_recipe, json_formatted_dataset, ingredient_list):
-    # THIS IS WORKING FOR EVERYTHING BUT THE FIRST ITEM IN THE INGREDIENTS LIST
     print(ingredient_list)
     questions = []
     questions.extend([f"How much {i}?" for i in ingredient_list])
@@ -101,12 +100,12 @@ def get_specific_ingredient_question(tokenized_recipe, json_formatted_dataset, i
                 ingredient_index = ingredient_index_options_best[0]
             else:
                 ingredient_index = ingredient_index_options[0]
-
+        print(ingredient_index, sep_index)
         # Get the index of the token [INGITEM] or [INGSTART] occuring before the ingredient in indexable_list whichever is closest
         # Get the index of all [INGITEM] in indexable_list
         ing_item_index = [i for i, x in enumerate(indexable_list) if x == '[INGITEM]']
-        # Get the index of the token [INSTSTART] in indexable_list
-        ing_start_index = indexable_list.index('[INSTSTART]')
+        # Get the index of the token [INGSTART] in indexable_list
+        ing_start_index = indexable_list.index('[INGSTART]')
         # Get all ing_item_indexes that are before the ingredient_index
         ing_item_index_before = [i for i in ing_item_index if i < ingredient_index]
         # If the ing_item_index is empty then the start index is the ing_start_index
