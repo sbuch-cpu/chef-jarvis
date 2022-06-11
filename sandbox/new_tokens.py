@@ -19,7 +19,7 @@ def main():
     recipe = recipe_scraper('https://www.jamieoliver.com/recipes/chicken-recipes/tender-and-crisp-chicken-legs-with-sweet-tomatoes/')
     tokenized_recipe = custom_tokenize_recipe(recipe['ingredients'], recipe['instructions'])
     print(tokenized_recipe)
-    question = "How do I make this a pasta dish?"
+    question = "What is the capital of Canada?"
     print(fine_tune_distilBERT(question, tokenized_recipe))
     return
 
