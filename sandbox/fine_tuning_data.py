@@ -1,3 +1,5 @@
+import time
+
 import pandas as pd
 from sandbox.new_tokens import custom_tokenize_recipe
 import re
@@ -14,19 +16,25 @@ def main():
     training_data['raw_ingredients'] = training_data['ingredients']
     training_data['ingredients'] = training_data['ingredients'].apply(add_units_to_ingredients)
     training_data['tokenized'] = training_data.apply(lambda x: custom_tokenize_recipe(x.ingredients, x.steps), axis=1)
-    # print(training_data['tokenized'].values[0])
     training_data.to_csv('../training_data/tokenized_recipes.csv')
-    # print(training_data)
     return
 
 
 def create_question_set():
     training_data = pd.read_csv('../training_data/tokenized_recipes.csv')
     training_data['raw_ingredients'] = training_data.apply(lambda x: re.findall(r"'\s*([^']*?)\s*'", x.raw_ingredients), axis=1)
-    json_formatted_data = question_generation(training_data['tokenized'].values[0],
-                                              training_data['raw_ingredients'].values[0])
-    print(json_formatted_data)
-    print(len(json_formatted_data))
+    tokenized = training_data['tokenized'].values
+    ingredients = training_data['raw_ingredients'].values
+    json_formatted_dataset = []
+    for i in range(len(tokenized)):
+        # print the progress of the loop
+        if i % 100 == 0:
+            print(f"{i}/{len(tokenized)} --- {round(i/len(tokenized)*100, 2)}%")
+        json_formatted_dataset.extend(question_generation(tokenized[i], ingredients[i], i))
+
+    with open('../training_data/question_set.json', 'w') as f:
+        f.write(str(json_formatted_dataset))
+    print(len(json_formatted_dataset))
     return
 
 
@@ -34,22 +42,24 @@ def add_units_to_ingredients(ing_list):
     return [f"{random_unit_of_measurement()} of {i}" for i in ing_list]
 
 
-def question_generation(tokenized_recipe, ingredients):
+def question_generation(tokenized_recipe, ingredients, recipe_index):
     json_formatted_dataset = []
     tokenized_recipe = tokenized_recipe.replace('[', ' [').replace(']', '] ')
-    # json_formatted_dataset = full_ingredient_list_question_generation(tokenized_recipe, json_formatted_dataset)
-    json_formatted_dataset = get_specific_ingredient_question(tokenized_recipe, json_formatted_dataset, ingredients)
+    json_formatted_dataset = full_ingredient_list_question_generation(tokenized_recipe, json_formatted_dataset, recipe_index)
+    json_formatted_dataset.extend(get_specific_ingredient_question(tokenized_recipe, json_formatted_dataset, ingredients, recipe_index))
     return json_formatted_dataset
 
 
-def full_ingredient_list_question_generation(tokenized_recipe, json_formatted_dataset):
+def full_ingredient_list_question_generation(tokenized_recipe, json_formatted_dataset, recipe_index):
     questions = ['What are the ingredients?',
                  'What ingredients do I need?',
                  'What ingredients are needed?',
                  'What are the ingredients for this recipe?',
                  'What ingredients do I need for this recipe?',
                  'Read me the ingredients.']
-    for question in questions:
+    # just choose three random questions to generate
+    random_questions = random.sample(questions, 3)
+    for question in random_questions:
         indexable_list = get_indexable_list(question, tokenized_recipe)
         # Get the index of the token [INGSTART] in indexable_list
         start_index = indexable_list.index('[INGSTART]')
@@ -59,13 +69,13 @@ def full_ingredient_list_question_generation(tokenized_recipe, json_formatted_da
         end_index -= 1  # Since it is inclusive, we need to remove 1 from the end index
         json_formatted_dataset.append({'question': question,
                                        'answer': answer,
+                                       'recipe_index': recipe_index,
                                        'start_index': start_index,
                                        'end_index': end_index})
     return json_formatted_dataset
 
 
-def get_specific_ingredient_question(tokenized_recipe, json_formatted_dataset, ingredient_list):
-    print(ingredient_list)
+def get_specific_ingredient_question(tokenized_recipe, json_formatted_dataset, ingredient_list, recipe_index):
     questions = []
     questions.extend([f"How much {i}?" for i in ingredient_list])
     questions.extend([f"How much {i} is needed?" for i in ingredient_list])
@@ -74,14 +84,14 @@ def get_specific_ingredient_question(tokenized_recipe, json_formatted_dataset, i
     questions.extend([f"How much {i} do I need for this recipe?" for i in ingredient_list])
     questions.extend([f"How much {i} is there?" for i in ingredient_list])
     questions.extend([f"How much {i} is there in this recipe?" for i in ingredient_list])
-
-    for idx, question in enumerate(questions):
+    # just choose three random questions to generate
+    random_questions = random.sample(questions, 3)
+    for idx, question in enumerate(random_questions):
         while idx >= len(ingredient_list):
             # Each question was created by iterating over the ingredients list so we know when we get to the end of the
             # list we have reached the end of a set of questions and need to get the index back in check
             idx -= len(ingredient_list)
         ingredient = ingredient_list[idx]
-        print(ingredient)
         indexable_list = get_indexable_list(question, tokenized_recipe)
 
         # Need to check that the index occurs after the SEP token so that we aren't looking for the answer in the question
@@ -100,7 +110,6 @@ def get_specific_ingredient_question(tokenized_recipe, json_formatted_dataset, i
                 ingredient_index = ingredient_index_options_best[0]
             else:
                 ingredient_index = ingredient_index_options[0]
-        print(ingredient_index, sep_index)
         # Get the index of the token [INGITEM] or [INGSTART] occuring before the ingredient in indexable_list whichever is closest
         # Get the index of all [INGITEM] in indexable_list
         ing_item_index = [i for i, x in enumerate(indexable_list) if x == '[INGITEM]']
@@ -120,6 +129,7 @@ def get_specific_ingredient_question(tokenized_recipe, json_formatted_dataset, i
         end_index -= 1
         json_formatted_dataset.append({'question': question,
                                        'answer': answer,
+                                       'recipe_index': recipe_index,
                                        'start_index': start_index,
                                        'end_index': end_index})
     return json_formatted_dataset
@@ -167,5 +177,9 @@ def random_unit_of_measurement():
 
 if __name__ == "__main__":
     # main()
+    # time running create_question_set()
+    start = time.time()
     create_question_set()
+    end = time.time()
+    print(f"Time taken: {end - start}")
     # print(random_unit_of_measurement())
