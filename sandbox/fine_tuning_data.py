@@ -26,7 +26,7 @@ def format_raw_recipe_dataset():
     """
     # Read the raw dataset
     module_path = get_path('chef-jarvis')
-    training_data = pd.read_csv(os.path.join(module_path, '/training_data/RAW_recipes.csv'))
+    training_data = pd.read_csv(os.path.join(module_path, 'training_data/RAW_recipes.csv'))
     # Remove the unnecessary columns from the dataset
     training_data.drop(['minutes', 'id', 'contributor_id', 'submitted', 'tags',
                         'nutrition', 'n_steps', 'description', 'n_ingredients'], axis=1, inplace=True)
@@ -46,7 +46,7 @@ def format_raw_recipe_dataset():
     training_data['tokenized'] = training_data.apply(lambda x: custom_tokenize_recipe(x.ingredients, x.steps), axis=1)
     print('Saving...')
     # Save the tokenized dataset
-    training_data.to_csv(os.path.join(module_path, '/training_data/tokenized_recipes.csv'))
+    training_data.to_csv(os.path.join(module_path, 'training_data/tokenized_recipes.csv'))
 
 
 def add_units_to_ingredients(ing_list):
@@ -127,7 +127,7 @@ def create_ingredients_question_set():
     """
     module_path = get_path('chef-jarvis')
     # Read the tokenized dataset
-    training_data = pd.read_csv(os.path.join(module_path, '/training_data/tokenized_recipes.csv'))
+    training_data = pd.read_csv(os.path.join(module_path, 'training_data/tokenized_recipes.csv'))
     # Convert the data in 'raw_ingredients' to a list of strings
     training_data['raw_ingredients'] = training_data.apply(lambda x: re.findall(r"'\s*([^']*?)\s*'", x.raw_ingredients),
                                                            axis=1)
@@ -142,7 +142,7 @@ def create_ingredients_question_set():
             print(f"{i}/{len(tokenized)} --- {round(i / len(tokenized) * 100, 2)}%")
         json_formatted_dataset.extend(question_generation_ingredients(recipe, ingredients[i], i))
     # Save the dataset
-    with open(os.path.join(module_path, '/training_data/question_set.json'), 'w') as f:
+    with open(os.path.join(module_path, 'training_data/question_set.json'), 'w') as f:
         f.write(str(json_formatted_dataset))
     # print the number of question answer pairs generated
     print(len(json_formatted_dataset))
