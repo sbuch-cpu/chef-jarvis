@@ -4,6 +4,17 @@ import pandas as pd
 from sandbox.new_tokens import custom_tokenize_recipe
 import re
 import random
+import os
+
+
+# # get path to current directory
+def get_path(base_folder):
+    path = os.path.dirname(os.path.abspath(__file__))
+    path_list = path.split('/')
+    for i, folder in enumerate(path_list):
+        if folder == base_folder:
+            return '/'.join(path_list[:i + 1])
+    return path
 
 
 def format_raw_recipe_dataset():
@@ -14,7 +25,8 @@ def format_raw_recipe_dataset():
     saved in the training_data folder under the name tokenized_recipes.csv.
     """
     # Read the raw dataset
-    training_data = pd.read_csv('../training_data/RAW_recipes.csv')
+    module_path = get_path('chef-jarvis')
+    training_data = pd.read_csv(os.path.join(module_path, '/training_data/RAW_recipes.csv'))
     # Remove the unnecessary columns from the dataset
     training_data.drop(['minutes', 'id', 'contributor_id', 'submitted', 'tags',
                         'nutrition', 'n_steps', 'description', 'n_ingredients'], axis=1, inplace=True)
@@ -26,7 +38,7 @@ def format_raw_recipe_dataset():
     training_data['raw_ingredients'] = training_data['ingredients']
     print('Adding units of measurement...')
     # add units of measurement to the ingredients list so the model can understand the ingredients
-    # These units are randomly generated so they do not always make sense for the ingredient they are associated with
+    # These units are randomly generated, so they do not always make sense for the ingredient they are associated with
     # This should not affect the accuracy of the model ... hopefully
     training_data['ingredients'] = training_data['ingredients'].apply(add_units_to_ingredients)
     print('Tokenizing...')
@@ -34,7 +46,7 @@ def format_raw_recipe_dataset():
     training_data['tokenized'] = training_data.apply(lambda x: custom_tokenize_recipe(x.ingredients, x.steps), axis=1)
     print('Saving...')
     # Save the tokenized dataset
-    training_data.to_csv('../training_data/tokenized_recipes.csv')
+    training_data.to_csv(os.path.join(module_path, '/training_data/tokenized_recipes.csv'))
 
 
 def add_units_to_ingredients(ing_list):
@@ -113,8 +125,9 @@ def create_ingredients_question_set():
     """
     This function creates a set of questions for the model to ask the user about the ingredients of a recipe.
     """
+    module_path = get_path('chef-jarvis')
     # Read the tokenized dataset
-    training_data = pd.read_csv('../training_data/tokenized_recipes.csv')
+    training_data = pd.read_csv(os.path.join(module_path, '/training_data/tokenized_recipes.csv'))
     # Convert the data in 'raw_ingredients' to a list of strings
     training_data['raw_ingredients'] = training_data.apply(lambda x: re.findall(r"'\s*([^']*?)\s*'", x.raw_ingredients),
                                                            axis=1)
@@ -129,7 +142,7 @@ def create_ingredients_question_set():
             print(f"{i}/{len(tokenized)} --- {round(i / len(tokenized) * 100, 2)}%")
         json_formatted_dataset.extend(question_generation_ingredients(recipe, ingredients[i], i))
     # Save the dataset
-    with open('../training_data/question_set.json', 'w') as f:
+    with open(os.path.join(module_path, '/training_data/question_set.json'), 'w') as f:
         f.write(str(json_formatted_dataset))
     # print the number of question answer pairs generated
     print(len(json_formatted_dataset))
@@ -255,8 +268,9 @@ def get_indexable_list(question, tokenized_recipe):
 if __name__ == "__main__":
     # format_raw_recipe_dataset()
     # time running create_question_set()
-    start = time.time()
-    create_ingredients_question_set()
-    end = time.time()
-    print(f"Time taken: {round(end - start, 2)} seconds")
+    # start = time.time()
+    # create_ingredients_question_set()
+    # end = time.time()
+    # print(f"Time taken: {round(end - start, 2)} seconds")
     # print(random_unit_of_measurement())
+    print(get_path('chef-jarvis'))
