@@ -268,9 +268,8 @@ def get_indexable_list(question, tokenized_recipe):
 if __name__ == "__main__":
     # format_raw_recipe_dataset()
     # time running create_question_set()
-    # start = time.time()
-    # create_ingredients_question_set()
-    # end = time.time()
-    # print(f"Time taken: {round(end - start, 2)} seconds")
+    start = time.time()
+    create_ingredients_question_set()
+    end = time.time()
+    print(f"Time taken: {round(end - start, 2)} seconds")
     # print(random_unit_of_measurement())
-    print(get_path('chef-jarvis'))
