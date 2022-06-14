@@ -32,6 +32,8 @@ def format_raw_recipe_dataset():
     training_data.drop(['minutes', 'id', 'contributor_id', 'submitted', 'tags',
                         'nutrition', 'n_steps', 'description', 'n_ingredients'], axis=1, inplace=True)
     print('Changing to lists...')
+    # replace all ampersands with ' &' so that the model can understand the steps
+    training_data['steps'] = training_data['steps'].apply(lambda x: x.replace('&', ' &'))
     # Convert the data in 'steps' and 'ingredients' from a string to a list of strings using regex
     training_data['steps'] = training_data.apply(lambda x: re.findall(r"'\s*([^']*?)\s*'", x.steps), axis=1)
     training_data['ingredients'] = training_data.apply(lambda x: re.findall(r"'\s*([^']*?)\s*'", x.ingredients), axis=1)
@@ -136,9 +138,11 @@ def create_ingredients_question_set(new=True, ingredients_questions=True, steps_
     # Convert the data in 'raw_ingredients' to a list of strings
     training_data['raw_ingredients'] = training_data.apply(lambda x: re.findall(r"'\s*([^']*?)\s*'", x.raw_ingredients),
                                                            axis=1)
+    training_data['steps'] = training_data.apply(lambda x: re.findall(r"'\s*([^']*?)\s*'", x.steps), axis=1)
     # Pull the tokenized recipe and the raw ingredients from the dataset
     tokenized = training_data['tokenized'].values
     ingredients = training_data['raw_ingredients'].values
+    steps = training_data['steps'].values
     if not new:
         # Read the existing question set json file using the json module
         with open(os.path.join(module_path, 'training_data/question_set.json'), 'r') as f:
@@ -155,7 +159,7 @@ def create_ingredients_question_set(new=True, ingredients_questions=True, steps_
             json_formatted_dataset.extend(question_generation_ingredients(recipe, ingredients[i], i))
         if steps_questions:
             # Create a list of questions and answers for the steps of the recipe
-            json_formatted_dataset.extend(question_generation_steps(recipe, i))
+            json_formatted_dataset.extend(question_generation_steps(recipe, len(steps[i]), i))
     # Save the dataset
     print("Saving the dataset...")
     with open(os.path.join(module_path, 'training_data/question_set.json'), 'w', encoding='utf-8') as f:
@@ -165,11 +169,11 @@ def create_ingredients_question_set(new=True, ingredients_questions=True, steps_
     print(len(json_formatted_dataset))
 
 
-def question_generation_steps(tokenized_recipe, recipe_index):
+def question_generation_steps(tokenized_recipe, number_of_steps, recipe_index):
     json_formatted_dataset = []
     tokenized_recipe = tokenized_recipe.replace('[', ' [').replace(']', '] ')
-    json_formatted_dataset = get_step_number_question(tokenized_recipe, recipe_index)
-    pass
+    json_formatted_dataset = get_step_number_question(tokenized_recipe, number_of_steps, recipe_index)
+    return json_formatted_dataset
 
 
 def question_generation_ingredients(tokenized_recipe, ingredients, recipe_index):
@@ -182,8 +186,7 @@ def question_generation_ingredients(tokenized_recipe, ingredients, recipe_index)
     """
     json_formatted_dataset = []
     tokenized_recipe = tokenized_recipe.replace('[', ' [').replace(']', '] ')
-    json_formatted_dataset = full_ingredient_list_question_generation(tokenized_recipe,
-                                                                      recipe_index)
+    json_formatted_dataset = full_ingredient_list_question_generation(tokenized_recipe, recipe_index)
     json_formatted_dataset.extend(
         get_specific_ingredient_question(tokenized_recipe, ingredients, recipe_index))
     return json_formatted_dataset
@@ -262,11 +265,11 @@ def get_specific_ingredient_question(tokenized_recipe, ingredient_list, recipe_i
         ing_item_index_before = [i for i in ing_item_index if i < ingredient_index]
         # If the ing_item_index is empty then the start index is the ing_start_index
         if not ing_item_index_before:
-            start_index = ing_start_index
+            start_index = ing_start_index + 1
         else:
-            start_index = ing_item_index_before[-1]
+            start_index = ing_item_index_before[-1] + 1
         # Get the index of the token [INGITEM] occuring after the ingredient in indexable_list
-        end_index = ing_item_index[len(ing_item_index_before)]
+        end_index = ing_item_index[len(ing_item_index_before)] + 1
 
         answer = ' '.join(indexable_list[start_index:end_index])
         end_index -= 1
@@ -283,9 +286,37 @@ def generate_steps_question(tokenized_recipe, recipe_index):
     number_of_steps = 1
 
 
-def get_step_number_question(tokenized_recipe, recipe_index, step_index):
-    questions = [f'What is step {step_index + 1}?', f'What is step {step_index + 1} for this recipe?']
-    pass
+def get_step_number_question(tokenized_recipe, number_of_steps, recipe_index):
+    json_formatted_dataset = []
+    questions = []
+    questions.extend([(f'What is step {step_number}?', step_number) for step_number in range(1, number_of_steps + 1)])
+    questions.extend([(f'What is step {step_number} for this recipe?', step_number)
+                      for step_number in range(1, number_of_steps + 1)])
+    # just choose three random questions to generate
+    try:
+        random_questions = random.sample(questions, 3)
+    except ValueError:
+        random_questions = questions
+        print(f'Could not sample {len(questions)} questions')
+    for question, step_number in random_questions:
+        indexable_list = get_indexable_list(question, tokenized_recipe)
+        # Get the index of the token [INSTSTART] in indexable_list
+        step_start_index = indexable_list.index('[INSTSTART]')
+        # Get the index of all [INSTITEM] tokens in indexable_list
+        step_item_indexes = [i for i, x in enumerate(indexable_list) if x == '[INSTITEM]']
+        end_index = step_item_indexes[step_number - 1]
+        if step_number == 1:
+            start_index = step_start_index + 1
+        else:
+            start_index = step_item_indexes[step_number - 2] + 1
+        answer = ' '.join(indexable_list[start_index:end_index+1])
+        end_index -= 1
+        json_formatted_dataset.append({'question': question,
+                                       'answer': answer,
+                                       'recipe_index': recipe_index,
+                                       'start_index': start_index,
+                                       'end_index': end_index})
+    return json_formatted_dataset
 
 
 def get_indexable_list(question, tokenized_recipe):
@@ -301,11 +332,10 @@ def get_indexable_list(question, tokenized_recipe):
 if __name__ == "__main__":
     # format_raw_recipe_dataset()
     # time running create_question_set()
-    # start = time.time()
-    create_ingredients_question_set(steps_questions=False)
-    # end = time.time()
-    # print(f"Time taken: {round(end - start, 2)} seconds")
-    # print(random_unit_of_measurement())
+    start = time.time()
+    create_ingredients_question_set()
+    end = time.time()
+    print(f"Time taken: {round(end - start, 2)} seconds")
     # Read the existing question set json file using the json module
     # module_path = get_path('chef-jarvis')
     # with open(os.path.join(module_path, 'training_data/question_set.json'), 'r') as f:
