@@ -166,6 +166,9 @@ def create_ingredients_question_set(new=True, ingredients_questions=True, steps_
 
 
 def question_generation_steps(tokenized_recipe, recipe_index):
+    json_formatted_dataset = []
+    tokenized_recipe = tokenized_recipe.replace('[', ' [').replace(']', '] ')
+    json_formatted_dataset = get_step_number_question(tokenized_recipe, recipe_index)
     pass
 
 
@@ -179,14 +182,15 @@ def question_generation_ingredients(tokenized_recipe, ingredients, recipe_index)
     """
     json_formatted_dataset = []
     tokenized_recipe = tokenized_recipe.replace('[', ' [').replace(']', '] ')
-    json_formatted_dataset = full_ingredient_list_question_generation(tokenized_recipe, json_formatted_dataset,
+    json_formatted_dataset = full_ingredient_list_question_generation(tokenized_recipe,
                                                                       recipe_index)
     json_formatted_dataset.extend(
-        get_specific_ingredient_question(tokenized_recipe, json_formatted_dataset, ingredients, recipe_index))
+        get_specific_ingredient_question(tokenized_recipe, ingredients, recipe_index))
     return json_formatted_dataset
 
 
-def full_ingredient_list_question_generation(tokenized_recipe, json_formatted_dataset, recipe_index):
+def full_ingredient_list_question_generation(tokenized_recipe, recipe_index):
+    json_formatted_dataset = []
     questions = ['What are the ingredients?',
                  'What ingredients do I need?',
                  'What ingredients are needed?',
@@ -211,7 +215,8 @@ def full_ingredient_list_question_generation(tokenized_recipe, json_formatted_da
     return json_formatted_dataset
 
 
-def get_specific_ingredient_question(tokenized_recipe, json_formatted_dataset, ingredient_list, recipe_index):
+def get_specific_ingredient_question(tokenized_recipe, ingredient_list, recipe_index):
+    json_formatted_dataset = []
     questions = []
     questions.extend([(f"How much {ing}?", i) for i, ing in enumerate(ingredient_list)])
     questions.extend([(f"How much {ing} is needed?", i) for i, ing in enumerate(ingredient_list)])
@@ -278,7 +283,7 @@ def generate_steps_question(tokenized_recipe, recipe_index):
     number_of_steps = 1
 
 
-def get_step_number_question(tokenized_recipe, json_formatted_dataset, recipe_index, step_index):
+def get_step_number_question(tokenized_recipe, recipe_index, step_index):
     questions = [f'What is step {step_index + 1}?', f'What is step {step_index + 1} for this recipe?']
     pass
 
