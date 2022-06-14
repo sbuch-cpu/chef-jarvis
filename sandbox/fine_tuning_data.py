@@ -5,7 +5,7 @@ from sandbox.new_tokens import custom_tokenize_recipe
 import re
 import random
 import os
-
+import json
 
 # # get path to current directory
 def get_path(base_folder):
@@ -121,11 +121,15 @@ def random_unit_of_measurement():
 
 
 #################  Ingredient Question Generation ##############################
-def create_ingredients_question_set():
+def create_ingredients_question_set(new=True, ingredients_questions=True, steps_questions=True):
     """
     This function creates a set of questions for the model to ask the user about the ingredients of a recipe.
     """
+
     module_path = get_path('chef-jarvis')
+    # if the tokenized_recipes.csv file does not exist then run format_raw_recipe_dataset() to create it
+    if not os.path.isfile(os.path.join(module_path, 'training_data/tokenized_recipes.csv')):
+        format_raw_recipe_dataset()
     # Read the tokenized dataset
     training_data = pd.read_csv(os.path.join(module_path, 'training_data/tokenized_recipes.csv'))
     # Convert the data in 'raw_ingredients' to a list of strings
@@ -134,19 +138,32 @@ def create_ingredients_question_set():
     # Pull the tokenized recipe and the raw ingredients from the dataset
     tokenized = training_data['tokenized'].values
     ingredients = training_data['raw_ingredients'].values
-    json_formatted_dataset = []
+    if not new:
+        # Read the existing question set json file using the json module
+        with open(os.path.join(module_path, 'training_data/question_set.json'), 'r') as f:
+            json_formatted_dataset = json.load(f)
+    else:
+        json_formatted_dataset = []
     # Generate question answer pairs from multiple questions per recipe
     for i, recipe in enumerate(tokenized):
         # print the progress of the loop for every 100 recipes
         if i % 100 == 0:
             print(f"{i}/{len(tokenized)} --- {round(i / len(tokenized) * 100, 2)}%")
-        json_formatted_dataset.extend(question_generation_ingredients(recipe, ingredients[i], i))
+        if ingredients_questions:
+            # Create a list of questions and answers for the ingredients of the recipe
+            json_formatted_dataset.extend(question_generation_ingredients(recipe, ingredients[i], i))
+        if steps_questions:
+            # Create a list of questions and answers for the steps of the recipe
+            json_formatted_dataset.extend(question_generation_steps(recipe, i))
     # Save the dataset
-    with open(os.path.join(module_path, 'training_data/question_set.json'), 'w') as f:
-        f.write(str(json_formatted_dataset))
+    with open(os.path.join(module_path, 'training_data/question_set.json'), 'w', encoding='utf-8') as f:
+        # f.write(str(json_formatted_dataset))
+        json.dump(json_formatted_dataset, f, ensure_ascii=False, indent=4)
     # print the number of question answer pairs generated
     print(len(json_formatted_dataset))
 
+def question_generation_steps(tokenized_recipe, recipe_index):
+    pass
 
 def question_generation_ingredients(tokenized_recipe, ingredients, recipe_index):
     """
@@ -214,7 +231,11 @@ def get_specific_ingredient_question(tokenized_recipe, json_formatted_dataset, i
         sep_index = indexable_list.index('[SEP]')
         if len(ingredient.split()) == 1:
             # If the ingredient is a single word, we can just search for it in the list
-            ingredient_index = indexable_list.index(ingredient)
+            # ingredient_index = indexable_list.index(ingredient)
+            ingredient_index_options = [i for i, x in enumerate(indexable_list) if x == ingredient]
+            # Remove all options that are before the SEP token
+            ingredient_index_options = [i for i in ingredient_index_options if i > sep_index]
+            ingredient_index = ingredient_index_options[0]
         else:
             ingredient_index_options = [i for i, x in enumerate(indexable_list) if x == ingredient.split()[0]]
             # Remove all options that are before the SEP token
@@ -253,6 +274,15 @@ def get_specific_ingredient_question(tokenized_recipe, json_formatted_dataset, i
 
 
 #################  Ingredient Question Generation ##############################
+def generate_steps_question(tokenized_recipe, recipe_index):
+    number_of_steps = 1
+
+
+
+
+def get_step_number_question(tokenized_recipe, json_formatted_dataset, recipe_index, step_index):
+    questions = [f'What is step {step_index + 1}?', f'What is step {step_index + 1} for this recipe?']
+    pass
 
 
 def get_indexable_list(question, tokenized_recipe):
@@ -268,8 +298,13 @@ def get_indexable_list(question, tokenized_recipe):
 if __name__ == "__main__":
     # format_raw_recipe_dataset()
     # time running create_question_set()
-    start = time.time()
-    create_ingredients_question_set()
-    end = time.time()
-    print(f"Time taken: {round(end - start, 2)} seconds")
+    # start = time.time()
+    create_ingredients_question_set(steps_questions=False)
+    # end = time.time()
+    # print(f"Time taken: {round(end - start, 2)} seconds")
     # print(random_unit_of_measurement())
+    # Read the existing question set json file using the json module
+    # module_path = get_path('chef-jarvis')
+    # with open(os.path.join(module_path, 'training_data/question_set.json'), 'r') as f:
+    #     json_formatted_dataset = json.load(f)
+    # print(json_formatted_dataset)
