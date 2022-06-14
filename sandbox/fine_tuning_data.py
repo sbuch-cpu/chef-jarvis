@@ -7,6 +7,7 @@ import random
 import os
 import json
 
+
 # # get path to current directory
 def get_path(base_folder):
     path = os.path.dirname(os.path.abspath(__file__))
@@ -156,14 +157,17 @@ def create_ingredients_question_set(new=True, ingredients_questions=True, steps_
             # Create a list of questions and answers for the steps of the recipe
             json_formatted_dataset.extend(question_generation_steps(recipe, i))
     # Save the dataset
+    print("Saving the dataset...")
     with open(os.path.join(module_path, 'training_data/question_set.json'), 'w', encoding='utf-8') as f:
         # f.write(str(json_formatted_dataset))
         json.dump(json_formatted_dataset, f, ensure_ascii=False, indent=4)
     # print the number of question answer pairs generated
     print(len(json_formatted_dataset))
 
+
 def question_generation_steps(tokenized_recipe, recipe_index):
     pass
+
 
 def question_generation_ingredients(tokenized_recipe, ingredients, recipe_index):
     """
@@ -209,20 +213,16 @@ def full_ingredient_list_question_generation(tokenized_recipe, json_formatted_da
 
 def get_specific_ingredient_question(tokenized_recipe, json_formatted_dataset, ingredient_list, recipe_index):
     questions = []
-    questions.extend([f"How much {i}?" for i in ingredient_list])
-    questions.extend([f"How much {i} is needed?" for i in ingredient_list])
-    questions.extend([f"How much {i} is needed for this recipe?" for i in ingredient_list])
-    questions.extend([f"How much {i} do I need?" for i in ingredient_list])
-    questions.extend([f"How much {i} do I need for this recipe?" for i in ingredient_list])
-    questions.extend([f"How much {i} is there?" for i in ingredient_list])
-    questions.extend([f"How much {i} is there in this recipe?" for i in ingredient_list])
+    questions.extend([(f"How much {ing}?", i) for i, ing in enumerate(ingredient_list)])
+    questions.extend([(f"How much {ing} is needed?", i) for i, ing in enumerate(ingredient_list)])
+    questions.extend([(f"How much {ing} is needed for this recipe?", i) for i, ing in enumerate(ingredient_list)])
+    questions.extend([(f"How much {ing} do I need?", i) for i, ing in enumerate(ingredient_list)])
+    questions.extend([(f"How much {ing} do I need for this recipe?", i) for i, ing in enumerate(ingredient_list)])
+    questions.extend([(f"How much {ing} is there?", i) for i, ing in enumerate(ingredient_list)])
+    questions.extend([(f"How much {ing} is there in this recipe?", i) for i, ing in enumerate(ingredient_list)])
     # just choose three random questions to generate
     random_questions = random.sample(questions, 3)
-    for idx, question in enumerate(random_questions):
-        while idx >= len(ingredient_list):
-            # Each question was created by iterating over the ingredients list so we know when we get to the end of the
-            # list we have reached the end of a set of questions and need to get the index back in check
-            idx -= len(ingredient_list)
+    for question, idx in random_questions:
         ingredient = ingredient_list[idx]
         indexable_list = get_indexable_list(question, tokenized_recipe)
 
@@ -276,8 +276,6 @@ def get_specific_ingredient_question(tokenized_recipe, json_formatted_dataset, i
 #################  Ingredient Question Generation ##############################
 def generate_steps_question(tokenized_recipe, recipe_index):
     number_of_steps = 1
-
-
 
 
 def get_step_number_question(tokenized_recipe, json_formatted_dataset, recipe_index, step_index):
