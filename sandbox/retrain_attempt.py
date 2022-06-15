@@ -3,6 +3,7 @@ import json
 import pandas as pd
 from fine_tuning_data import get_path
 from distilbert_custom.distilBERT_attempt import get_model_and_tokenizer
+import pickle
 
 from torch.utils.data import Dataset
 from torch.utils.data import DataLoader
@@ -30,7 +31,10 @@ def tokenize_data(questions_dataset, contexts_dataset):
     contexts = [context_options[data['recipe_index']] for data in questions_dataset]
     # Tokenize questions and contexts
     data_encodings = tokenizer(questions, contexts, truncation=True, padding=True)
-
+    # Save tokenized data to pickle file
+    with open('tokenized_data.pkl', 'wb') as file:
+        # A new file will be created
+        pickle.dump(data_encodings, file)
 
 def split_set():
     print("coming later")
