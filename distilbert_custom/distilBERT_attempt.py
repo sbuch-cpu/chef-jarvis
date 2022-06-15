@@ -29,8 +29,9 @@ def fine_tune_distilBERT(question, context):
     model.resize_token_embeddings(len(tokenizer))
 
     inputs = tokenizer(question, context, return_tensors="pt")
-    print(inputs['input_ids'])
-    print([tokenizer.decode(i) for i in inputs['input_ids']])
+    print(inputs)
+    # print(inputs['input_ids'])
+    # print([tokenizer.decode(i) for i in inputs['input_ids']])
 
     with torch.no_grad():
         outputs = model(**inputs)
