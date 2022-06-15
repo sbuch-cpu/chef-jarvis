@@ -8,7 +8,7 @@ import os
 import json
 
 
-# # get path to current directory
+# get path to current directory
 def get_path(base_folder):
     path = os.path.dirname(os.path.abspath(__file__))
     path_list = path.split('/')
@@ -112,7 +112,7 @@ def random_unit_of_measurement():
                           'pound', 'quart', 'stick', 'whole', 'can']
     # Create a full list of units of measurement
     unit_list = pluralizable_units.copy()
-    unit_list.extend(['tsp', 'tbsp', 'lb', 'oz', 'g', 'mg', 'kg', 'fl oz', 'ml', 'l', 't', 'qt', 'c'])
+    unit_list.extend(['tsp', 'tbsp', 'lb', 'oz', 'g', 'mg', 'kg', 'fl oz', 'ml', 'L', 't', 'qt', 'c'])
     unit = random.choice(unit_list)  # Choose a random unit of measurement
 
     # If the unit of measurement can be pluralized and the number is not one then add an 's' to the end of the unit of
@@ -126,7 +126,7 @@ def random_unit_of_measurement():
 #################  Ingredient Question Generation ##############################
 def create_ingredients_question_set(new=True, ingredients_questions=True, steps_questions=True):
     """
-    This function creates a set of questions for the model to ask the user about the ingredients of a recipe.
+    This function creates a set of questions for the user to ask chef jarvis about the ingredients of a recipe.
     """
 
     module_path = get_path('chef-jarvis')
@@ -178,7 +178,7 @@ def question_generation_steps(tokenized_recipe, number_of_steps, recipe_index):
 
 def question_generation_ingredients(tokenized_recipe, ingredients, recipe_index):
     """
-    This function generates a set of questions for the model to ask the user about the ingredients of a recipe.
+    This function generates a set of questions for the user to ask the chef jarvis about the ingredients of a recipe.
     :param tokenized_recipe:
     :param ingredients:
     :param recipe_index:
@@ -330,7 +330,7 @@ def get_indexable_list(question, tokenized_recipe):
 
 
 if __name__ == "__main__":
-    # format_raw_recipe_dataset()
+    format_raw_recipe_dataset()
     # time running create_question_set()
     start = time.time()
     create_ingredients_question_set()
