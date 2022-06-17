@@ -1,6 +1,10 @@
+# WITH SOME CODE FROM https://towardsdatascience.com/how-to-fine-tune-a-q-a-transformer-86f91ec92997
+
 import os
 import json
 import pandas as pd
+from transformers import DistilBertForQuestionAnswering
+from transformers import DistilBertTokenizer
 from fine_tuning_data import get_path
 from distilbert_custom.distilBERT_attempt import get_model_and_tokenizer
 import pickle
@@ -10,6 +14,7 @@ from torch.utils.data import Dataset
 from torch.utils.data import DataLoader
 from torch.utils.data import random_split
 from tqdm import tqdm
+
 
 # define class elsewhere?
 class Jarvis_Dataset(torch.utils.data.Dataset):
@@ -39,7 +44,7 @@ def tokenize_data(questions_dataset, contexts_dataset):
     model, tokenizer = get_model_and_tokenizer()
 
     # take a random sample of 10 questions - just for testing purposes
-    questions_dataset = random.sample(questions_dataset, 10)
+    questions_dataset = random.sample(questions_dataset, 5)
 
     # Get questions and context from datasets
     questions = [data['question'] for data in questions_dataset]
@@ -87,7 +92,6 @@ def split_set():
 def fine_tune(train_dataset):
     # Load DistilBERT model and tokenizer
     model, tokenizer = get_model_and_tokenizer()
-    # CODE FROM https://towardsdatascience.com/how-to-fine-tune-a-q-a-transformer-86f91ec92997
     # setup GPU/CPU
     device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
     # move model over to detected device
@@ -96,11 +100,8 @@ def fine_tune(train_dataset):
     model.train()
     # initialize adam optimizer with weight decay (reduces chance of overfitting)
     optim = torch.optim.AdamW(model.parameters(), lr=5e-5)
-    #optim = AdamW(model.parameters(), lr=5e-5) OLD VERSION- new implementation above
-
     # initialize data loader for training data
     train_loader = DataLoader(train_dataset, batch_size=16, shuffle=True)
-
     for epoch in range(3):
         # set model to train mode
         model.train()
@@ -127,14 +128,59 @@ def fine_tune(train_dataset):
             # print relevant info to progress bar
             loop.set_description(f'Epoch {epoch}')
             loop.set_postfix(loss=loss.item())
+    return model, tokenizer
 
+def save_model(model, tokenizer):
+    # Create a directory for the new model
+    model_path = 'models/distilbert-custom'
+    if not os.path.exists(model_path):
+        os.makedirs(model_path)
+    # Save the model
+    model.save_pretrained(model_path)
+    tokenizer.save_pretrained(model_path)
+    return model_path
+
+def test_model_accuracy(test_set, path):
+    # Load the model:
+    model = DistilBertForQuestionAnswering.from_pretrained(path)
+    tokenizer = DistilBertTokenizer.from_pretrained(path)
+    # setup GPU/CPU
+    device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
+    # Set model to eval mode
+    model.eval()
+    # initialize validation set data loader
+    val_loader = DataLoader(test_set, batch_size=16)
+    # initialize list to store accuracies
+    acc = []
+    # loop through batches
+    for batch in val_loader:
+        # we don't need to calculate gradients as we're not training
+        with torch.no_grad():
+            # pull batched items from loader
+            input_ids = batch['input_ids'].to(device)
+            attention_mask = batch['attention_mask'].to(device)
+            # we will use true positions for accuracy calc
+            start_true = batch['start_positions'].to(device)
+            end_true = batch['end_positions'].to(device)
+            # make predictions
+            outputs = model(input_ids, attention_mask=attention_mask)
+            # pull prediction tensors out and argmax to get predicted tokens
+            start_pred = torch.argmax(outputs['start_logits'], dim=1)
+            end_pred = torch.argmax(outputs['end_logits'], dim=1)
+            # calculate accuracy for both and append to accuracy list
+            acc.append(((start_pred == start_true).sum() / len(start_pred)).item())
+            acc.append(((end_pred == end_true).sum() / len(end_pred)).item())
+    # calculate average accuracy in total
+    acc = sum(acc) / len(acc)
+    print(acc)
 
 def main():
     # Uncomment first line to get data tokenized and saved to pickle file
     # get_dataset_ready()
     train, test = split_set()
-    fine_tune(train)
-
+    trained_model, trained_tokenizer, model_outputs = fine_tune(train)
+    pretrained_path = save_model(trained_model, trained_tokenizer) # does tokenizer need to be passed in?
+    test_model_accuracy(test, pretrained_path)
 
 if __name__ == "__main__":
     main()
