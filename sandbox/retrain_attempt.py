@@ -1,8 +1,12 @@
+# WITH SOME CODE FROM https://towardsdatascience.com/how-to-fine-tune-a-q-a-transformer-86f91ec92997
+
 import os
 import json
 import time
 
 import pandas as pd
+from transformers import DistilBertForQuestionAnswering
+from transformers import DistilBertTokenizer
 from fine_tuning_data import get_path
 from distilbert_custom.distilBERT_attempt import get_model_and_tokenizer
 import pickle
@@ -43,7 +47,7 @@ def tokenize_data(questions_dataset, contexts_dataset):
     model, tokenizer = get_model_and_tokenizer()
 
     # take a random sample of 10 questions - just for testing purposes
-    questions_dataset = random.sample(questions_dataset, 10000)
+    questions_dataset = random.sample(questions_dataset, 5)
 
     # Get questions and context from datasets
     questions = [data['question'] for data in questions_dataset]
@@ -96,7 +100,6 @@ def split_set():
 def fine_tune(train_dataset):
     # Load DistilBERT model and tokenizer
     model, tokenizer = get_model_and_tokenizer()
-    # CODE FROM https://towardsdatascience.com/how-to-fine-tune-a-q-a-transformer-86f91ec92997
     # setup GPU/CPU
     device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
     # move model over to detected device
@@ -109,7 +112,6 @@ def fine_tune(train_dataset):
 
     # initialize data loader for training data
     train_loader = DataLoader(train_dataset, batch_size=16, shuffle=True)
-
     for epoch in range(3):
         # set model to train mode
         model.train()
@@ -136,33 +138,53 @@ def fine_tune(train_dataset):
             # print relevant info to progress bar
             loop.set_description(f'Epoch {epoch}')
             loop.set_postfix(loss=loss.item())
-    # evaluate model on test set
-    test_dataset = split_set()[1]
-    test_loader = DataLoader(test_dataset, batch_size=16, shuffle=True)
-    # set model to eval mode
-    model.eval()
-    # setup loop (we use tqdm for the progress bar)
-    loop = tqdm(test_loader, leave=True)
-    for batch in loop:
-        # pull all the tensor batches required for training
-        input_ids = batch['input_ids'].to(device)
-        attention_mask = batch['attention_mask'].to(device)
-        start_positions = batch['start_positions'].to(device)
-        end_positions = batch['end_positions'].to(device)
-        # train model on batch and return outputs (incl. loss)
-        outputs = model(input_ids, attention_mask=attention_mask,
-                        start_positions=start_positions,
-                        end_positions=end_positions)
-        # extract loss
-        loss = outputs[0]
-        # print relevant info to progress bar
-        loop.set_description(f'Epoch {epoch}')
-        loop.set_postfix(loss=loss.item())
-    # save model
-    torch.save(model, 'model.pt')
-    # save tokenizer
-    torch.save(tokenizer, 'tokenizer.pt')
     return model, tokenizer
+
+
+def save_model(model, tokenizer):
+    # Create a directory for the new model
+    model_path = 'models/distilbert-custom'
+    if not os.path.exists(model_path):
+        os.makedirs(model_path)
+    # Save the model
+    model.save_pretrained(model_path)
+    tokenizer.save_pretrained(model_path)
+    return model_path
+
+
+def test_model_accuracy(test_set, path):
+    # Load the model:
+    model = DistilBertForQuestionAnswering.from_pretrained(path)
+    tokenizer = DistilBertTokenizer.from_pretrained(path)
+    # setup GPU/CPU
+    device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
+    # Set model to eval mode
+    model.eval()
+    # initialize validation set data loader
+    val_loader = DataLoader(test_set, batch_size=16)
+    # initialize list to store accuracies
+    acc = []
+    # loop through batches
+    for batch in val_loader:
+        # we don't need to calculate gradients as we're not training
+        with torch.no_grad():
+            # pull batched items from loader
+            input_ids = batch['input_ids'].to(device)
+            attention_mask = batch['attention_mask'].to(device)
+            # we will use true positions for accuracy calc
+            start_true = batch['start_positions'].to(device)
+            end_true = batch['end_positions'].to(device)
+            # make predictions
+            outputs = model(input_ids, attention_mask=attention_mask)
+            # pull prediction tensors out and argmax to get predicted tokens
+            start_pred = torch.argmax(outputs['start_logits'], dim=1)
+            end_pred = torch.argmax(outputs['end_logits'], dim=1)
+            # calculate accuracy for both and append to accuracy list
+            acc.append(((start_pred == start_true).sum() / len(start_pred)).item())
+            acc.append(((end_pred == end_true).sum() / len(end_pred)).item())
+    # calculate average accuracy in total
+    acc = sum(acc) / len(acc)
+    print(acc)
 
 
 def main():
@@ -175,14 +197,10 @@ def main():
     # Time split_set()
     start_time = time.time()
     train, test = split_set()
-    end_time = time.time()
-    print(f'Time taken to split dataset: {end_time - start_time} seconds')
-    # Time fine_tune(train)
-    start_time = time.time()
-    fine_tune(train)
-    end_time_last = time.time()
-    print(f'Time taken to fine tune: {end_time_last - start_time} seconds')
-    print(f'Total time taken: {end_time_last - start_time_first} seconds')
+
+    trained_model, trained_tokenizer, model_outputs = fine_tune(train)
+    pretrained_path = save_model(trained_model, trained_tokenizer)  # does tokenizer need to be passed in?
+    test_model_accuracy(test, pretrained_path)
 
 
 if __name__ == "__main__":
