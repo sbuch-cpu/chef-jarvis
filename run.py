@@ -1,7 +1,6 @@
-from distilbert_custom.speech_to_text import speech_to_audio
-from distilbert_custom.distilBERT_attempt import ask_distilBERT
-from distilbert_custom.text_to_speech import gTTS_model
-from web_scraping.scraping import recipe_scraper
+from model_implementation.speech_text_conversion import speech_to_audio, gTTS_model
+from model_implementation.question_answer import ask_distilBERT
+from model_implementation.scraping import recipe_scraper
 
 
 def main():

@@ -7,8 +7,8 @@ import time
 import pandas as pd
 from transformers import DistilBertForQuestionAnswering
 from transformers import DistilBertTokenizer
-from fine_tuning_data import get_path
-from distilbert_custom.distilBERT_attempt import get_model_and_tokenizer
+from fine_tuning_questions import get_path
+from utilities import get_model_and_tokenizer
 import pickle
 import torch
 import random
@@ -33,11 +33,11 @@ class Jarvis_Dataset(torch.utils.data.Dataset):
 def load_data_to_datasets():
     # Read the existing question set json file using the json module
     module_path = get_path('chef-jarvis')
-    with open(os.path.join(module_path, 'training_data/question_set.json'), 'r') as f:
+    with open(os.path.join(module_path, 'training_dataset/question_set.json'), 'r') as f:
         json_formatted_dataset = json.load(f)
 
     # Read the contexts from the tokenized_recipes.csv file
-    contexts = pd.read_csv(os.path.join(module_path, 'training_data/tokenized_recipes.csv'), index_col=0)
+    contexts = pd.read_csv(os.path.join(module_path, 'training_dataset/tokenized_recipes.csv'), index_col=0)
 
     return json_formatted_dataset, contexts
 
@@ -60,7 +60,7 @@ def tokenize_data(questions_dataset, contexts_dataset):
     end_positions = [data['end_index'] for data in questions_dataset]
     data_encodings.update({'start_positions': start_positions, 'end_positions': end_positions})
     # Save tokenized data to pickle file
-    with open('tokenized_data.pkl', 'wb') as file:
+    with open('../models_and_data/datasplits/tokenized_data.pkl', 'wb') as file:
         # A new file will be created
         pickle.dump(data_encodings, file)
     # return data_encodings, model, tokenizer
@@ -68,12 +68,12 @@ def tokenize_data(questions_dataset, contexts_dataset):
 
 def initialize_dataset():
     # Load tokenized data from pickle file
-    with open('tokenized_data.pkl', 'rb') as file:
+    with open('../models_and_data/datasplits/tokenized_data.pkl', 'rb') as file:
         data_encodings = pickle.load(file)
     # Create a dataset from the tokenized data
     dataset = Jarvis_Dataset(data_encodings)
     # Pickle the dataset
-    with open('initialized_data.pkl', 'wb') as file:
+    with open('../models_and_data/datasplits/initialized_data.pkl', 'wb') as file:
         pickle.dump(dataset, file)
 
 
@@ -86,7 +86,7 @@ def get_dataset_ready():
 
 def split_set():
     # Load initialized data from pickle file
-    with open('initialized_data.pkl', 'rb') as file:
+    with open('../models_and_data/datasplits/initialized_data.pkl', 'rb') as file:
         dataset = pickle.load(file)
     # Split the dataset into training and validation sets using 80/20 split
     test_split = 0.2
@@ -143,7 +143,7 @@ def fine_tune(train_dataset):
 
 def save_model(model, tokenizer):
     # Create a directory for the new model
-    model_path = 'models/distilbert-custom'
+    model_path = 'model_implementation/distilbert-custom'
     if not os.path.exists(model_path):
         os.makedirs(model_path)
     # Save the model
