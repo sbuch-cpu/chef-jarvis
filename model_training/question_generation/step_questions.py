@@ -1,6 +1,5 @@
 import random
-
-from utilities import get_indexable_list
+from utilities.utilities import get_indexable_list
 
 
 def generate_steps_question(tokenized_recipe, recipe_index):

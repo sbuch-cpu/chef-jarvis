@@ -1,103 +1,17 @@
 # WITH SOME CODE FROM https://towardsdatascience.com/how-to-fine-tune-a-q-a-transformer-86f91ec92997
 
 import os
-import json
-import time
-
 import pandas as pd
 from transformers import DistilBertForQuestionAnswering
-from transformers import DistilBertTokenizer
-from fine_tuning_questions import get_path
-from utilities import get_model_and_tokenizer
-import pickle
+from model_training.training_data_prep import get_dataset_ready, split_set
+from utilities.utilities import get_model_and_tokenizer
+from utilities.path_utilities import PATHS
 import torch
-import random
-from torch.utils.data import Dataset
 from torch.utils.data import DataLoader
-from torch.utils.data import random_split
 from tqdm import tqdm
 
 
-# define class elsewhere?
-class Jarvis_Dataset(torch.utils.data.Dataset):
-    def __init__(self, encodings):
-        self.encodings = encodings
-
-    def __getitem__(self, idx):
-        return {key: torch.tensor(val[idx]) for key, val in self.encodings.items()}
-
-    def __len__(self):
-        return len(self.encodings.input_ids)
-
-
-def load_data_to_datasets():
-    # Read the existing question set json file using the json module
-    module_path = get_path('chef-jarvis')
-    with open(os.path.join(module_path, 'training_dataset/question_set.json'), 'r') as f:
-        json_formatted_dataset = json.load(f)
-
-    # Read the contexts from the tokenized_recipes.csv file
-    contexts = pd.read_csv(os.path.join(module_path, 'training_dataset/tokenized_recipes.csv'), index_col=0)
-
-    return json_formatted_dataset, contexts
-
-
-def tokenize_data(questions_dataset, contexts_dataset):
-    # Load DistilBERT model and tokenizer
-    model, tokenizer = get_model_and_tokenizer()
-
-    # take a random sample of 10 questions - just for testing purposes
-    questions_dataset = random.sample(questions_dataset, 5)
-
-    # Get questions and context from datasets
-    questions = [data['question'] for data in questions_dataset]
-    context_options = contexts_dataset['tokenized'].values
-    contexts = [context_options[data['recipe_index']] for data in questions_dataset]
-    # Tokenize questions and contexts
-    data_encodings = tokenizer(questions, contexts, truncation=True, padding=True)
-    # Add tokenized start and end positions to data_encodings
-    start_positions = [data['start_index'] for data in questions_dataset]
-    end_positions = [data['end_index'] for data in questions_dataset]
-    data_encodings.update({'start_positions': start_positions, 'end_positions': end_positions})
-    # Save tokenized data to pickle file
-    with open('../models_and_data/datasplits/tokenized_data.pkl', 'wb') as file:
-        # A new file will be created
-        pickle.dump(data_encodings, file)
-    # return data_encodings, model, tokenizer
-
-
-def initialize_dataset():
-    # Load tokenized data from pickle file
-    with open('../models_and_data/datasplits/tokenized_data.pkl', 'rb') as file:
-        data_encodings = pickle.load(file)
-    # Create a dataset from the tokenized data
-    dataset = Jarvis_Dataset(data_encodings)
-    # Pickle the dataset
-    with open('../models_and_data/datasplits/initialized_data.pkl', 'wb') as file:
-        pickle.dump(dataset, file)
-
-
-def get_dataset_ready():
-    # Get data ready for training and testing
-    json_dataset, recipe_context = load_data_to_datasets()
-    tokenize_data(json_dataset, recipe_context)
-    initialize_dataset()
-
-
-def split_set():
-    # Load initialized data from pickle file
-    with open('../models_and_data/datasplits/initialized_data.pkl', 'rb') as file:
-        dataset = pickle.load(file)
-    # Split the dataset into training and validation sets using 80/20 split
-    test_split = 0.2
-    dataset_size = len(dataset)
-    test_size = int(test_split * dataset_size)
-    train_size = dataset_size - test_size
-    train_set, test_set = random_split(dataset, [train_size, test_size])
-    return train_set, test_set
-
-
-def fine_tune(train_dataset):
+def fine_tune(train_dataset, batch_size=16, num_epochs=3, loss_function='AdamW', optimizer='backward'):
     # Load DistilBERT model and tokenizer
     model, tokenizer = get_model_and_tokenizer()
     # setup GPU/CPU
@@ -106,15 +20,19 @@ def fine_tune(train_dataset):
     model.to(device)
     # activate training mode of model
     model.train()
-    # initialize adam optimizer with weight decay (reduces chance of overfitting)
-    optim = torch.optim.AdamW(model.parameters(), lr=5e-5)
+
+    if optimizer == 'AdamW':
+        # initialize adam optimizer with weight decay (reduces chance of overfitting)
+        optim = torch.optim.AdamW(model.parameters(), lr=5e-5)
+    else:
+        optim = torch.optim.AdamW(model.parameters(), lr=5e-5)
     # optim = AdamW(model.parameters(), lr=5e-5) OLD VERSION- new implementation above
 
     # initialize data loader for training data
-    train_loader = DataLoader(train_dataset, batch_size=16, shuffle=True)
-    for epoch in range(3):
-        # set model to train mode
-        model.train()
+    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
+    # set model to train mode
+    model.train()
+    for epoch in range(num_epochs):
         # setup loop (we use tqdm for the progress bar)
         loop = tqdm(train_loader, leave=True)
         for batch in loop:
@@ -132,7 +50,10 @@ def fine_tune(train_dataset):
             # extract loss
             loss = outputs[0]
             # calculate loss for every parameter that needs grad update
-            loss.backward()
+            if loss_function == "backward":
+                loss.backward()
+            else:
+                loss.backward()
             # update parameters
             optim.step()
             # print relevant info to progress bar
@@ -141,9 +62,7 @@ def fine_tune(train_dataset):
     return model, tokenizer
 
 
-def save_model(model, tokenizer):
-    # Create a directory for the new model
-    model_path = 'model_implementation/distilbert-custom'
+def save_model(model, tokenizer, model_path=PATHS['MODEL']):
     if not os.path.exists(model_path):
         os.makedirs(model_path)
     # Save the model
@@ -152,16 +71,15 @@ def save_model(model, tokenizer):
     return model_path
 
 
-def test_model_accuracy(test_set, path):
-    # Load the model:
+def test_model_accuracy(test_set, path, batch_size=16):
+    # Load the model
     model = DistilBertForQuestionAnswering.from_pretrained(path)
-    tokenizer = DistilBertTokenizer.from_pretrained(path)
     # setup GPU/CPU
     device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
     # Set model to eval mode
     model.eval()
     # initialize validation set data loader
-    val_loader = DataLoader(test_set, batch_size=16)
+    val_loader = DataLoader(test_set, batch_size=batch_size)
     # initialize list to store accuracies
     acc = []
     # loop through batches
@@ -184,24 +102,52 @@ def test_model_accuracy(test_set, path):
             acc.append(((end_pred == end_true).sum() / len(end_pred)).item())
     # calculate average accuracy in total
     acc = sum(acc) / len(acc)
-    print(acc)
+    print(f'Model Accuracy = {acc * 100}%')
+    return acc
 
 
-def main():
-    # Uncomment first line to get data tokenized and saved to pickle file
-    # Time get_dataset_ready()
-    start_time_first = time.time()
-    get_dataset_ready()
-    end_time = time.time()
-    print(f'Time taken to get dataset ready: {end_time - start_time_first} seconds')
-    # Time split_set()
-    start_time = time.time()
-    train, test = split_set()
+def main(training_params, new_dataset=False, training_tracking_path=PATHS['TRAINING_TRACKING']):
+    if new_dataset:
+        get_dataset_ready(size=training_params['dataset_size'],
+                          truncation=training_params['truncation'],
+                          padding=training_params['padding'])
 
-    trained_model, trained_tokenizer, model_outputs = fine_tune(train)
-    pretrained_path = save_model(trained_model, trained_tokenizer)  # does tokenizer need to be passed in?
-    test_model_accuracy(test, pretrained_path)
+    train, test = split_set(training_params['test/train'])
+    if not new_dataset:
+        training_params['dataset_size'] = len(train) + len(test)
+    trained_model, trained_tokenizer = fine_tune(train,
+                                                 batch_size=training_params['batch_size'],
+                                                 num_epochs=training_params['num_epochs'],
+                                                 loss_function=training_params['loss_function'],
+                                                 optimizer=training_params['optimizer'])
+    pretrained_path = save_model(trained_model, trained_tokenizer)
+    training_params['accuracy'] = test_model_accuracy(test,
+                                                      pretrained_path,
+                                                      batch_size=training_params['batch_size'])
+    if os.path.exists(training_tracking_path):
+        training_tracking = pd.read_csv(training_tracking_path, index_col=0)
+    else:
+        training_tracking = pd.DataFrame(columns=training_params.keys())
+    new_row_params = {k: [v] for k, v in training_params.items()}
+    print(new_row_params)
+    new_row = pd.DataFrame(new_row_params, columns=training_params.keys())
+    print(new_row)
+    training_tracking = pd.concat([training_tracking, new_row])
+    training_tracking.reset_index(inplace=True, drop=True)
+    print(training_tracking)
+    training_tracking.to_csv(training_tracking_path)
 
 
 if __name__ == "__main__":
-    main()
+    training_information = {
+        'dataset_size': 200,
+        'test/train': 0.2,
+        'batch_size': 10,
+        'num_epochs': 5,
+        'truncation': True,
+        'padding': True,
+        'loss_function': 'backward',
+        'optimizer': 'AdamW',
+        'accuracy': None
+    }
+    main(training_information, new_dataset=True)

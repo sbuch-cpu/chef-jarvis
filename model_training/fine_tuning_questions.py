@@ -7,21 +7,25 @@ from model_training.question_generation.ingredient_questions import full_ingredi
 import re
 import os
 import json
-from utilities import get_path
+
+from model_training.question_generation.step_questions import get_step_number_question
+from utilities.path_utilities import PATHS
 
 
 #################  Ingredient Question Generation ##############################
-def create_ingredients_question_set(new=True, ingredients_questions=True, steps_questions=True):
+def create_ingredients_question_set(new=True,
+                                    ingredients_questions=True,
+                                    steps_questions=True,
+                                    question_set_path=PATHS['QUESTION_SET'],
+                                    tokenized_recipes_path=PATHS['TOKENIZED_RECIPES']):
     """
     This function creates a set of questions for the user to ask chef jarvis about the ingredients of a recipe.
     """
-
-    module_path = get_path('chef-jarvis')
     # if the tokenized_recipes.csv file does not exist then run format_raw_recipe_dataset() to create it
-    if not os.path.isfile(os.path.join(module_path, 'training_dataset/tokenized_recipes.csv')):
+    if not os.path.isfile(tokenized_recipes_path):
         format_raw_recipe_dataset()
     # Read the tokenized dataset
-    training_data = pd.read_csv(os.path.join(module_path, 'training_dataset/tokenized_recipes.csv'))
+    training_data = pd.read_csv(tokenized_recipes_path)
     # Convert the data in 'raw_ingredients' to a list of strings
     training_data['raw_ingredients'] = training_data.apply(lambda x: re.findall(r"'\s*([^']*?)\s*'", x.raw_ingredients),
                                                            axis=1)
@@ -32,7 +36,7 @@ def create_ingredients_question_set(new=True, ingredients_questions=True, steps_
     steps = training_data['steps'].values
     if not new:
         # Read the existing question set json file using the json module
-        with open(os.path.join(module_path, 'training_dataset/question_set.json'), 'r') as f:
+        with open(question_set_path, 'r') as f:
             json_formatted_dataset = json.load(f)
     else:
         json_formatted_dataset = []
@@ -49,7 +53,7 @@ def create_ingredients_question_set(new=True, ingredients_questions=True, steps_
             json_formatted_dataset.extend(question_generation_steps(recipe, len(steps[i]), i))
     # Save the dataset
     print("Saving the dataset...")
-    with open(os.path.join(module_path, 'training_dataset/question_set.json'), 'w', encoding='utf-8') as f:
+    with open(question_set_path, 'w', encoding='utf-8') as f:
         # f.write(str(json_formatted_dataset))
         json.dump(json_formatted_dataset, f, ensure_ascii=False, indent=4)
     # print the number of question answer pairs generated
@@ -72,8 +76,7 @@ def question_generation_ingredients(tokenized_recipe, ingredients, recipe_index)
     """
     tokenized_recipe = tokenized_recipe.replace('[', ' [').replace(']', '] ')
     json_formatted_dataset = full_ingredient_list_question_generation(tokenized_recipe, recipe_index)
-    json_formatted_dataset.extend(
-        get_specific_ingredient_question(tokenized_recipe, ingredients, recipe_index))
+    json_formatted_dataset.extend(get_specific_ingredient_question(tokenized_recipe, ingredients, recipe_index))
     return json_formatted_dataset
 
 
@@ -84,8 +87,3 @@ if __name__ == "__main__":
     create_ingredients_question_set()
     end = time.time()
     print(f"Time taken: {round(end - start, 2)} seconds")
-    # Read the existing question set json file using the json module
-    # module_path = get_path('chef-jarvis')
-    # with open(os.path.join(module_path, 'training_dataset/question_set.json'), 'r') as f:
-    #     json_formatted_dataset = json.load(f)
-    # print(json_formatted_dataset)

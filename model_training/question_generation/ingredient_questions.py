@@ -1,6 +1,5 @@
 import random
-
-from utilities import get_indexable_list
+from utilities.utilities import get_indexable_list
 
 
 def full_ingredient_list_question_generation(tokenized_recipe, recipe_index):
@@ -79,7 +78,7 @@ def get_specific_ingredient_question(tokenized_recipe, ingredient_list, recipe_i
             start_index = ing_start_index + 1
         else:
             start_index = ing_item_index_before[-1] + 1
-        # Get the index of the token [INGITEM] occuring after the ingredient in indexable_list
+        # Get the index of the token [INGITEM] occurring after the ingredient in indexable_list
         end_index = ing_item_index[len(ing_item_index_before)] + 1
 
         answer = ' '.join(indexable_list[start_index:end_index])

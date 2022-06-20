@@ -1,18 +1,19 @@
-import os
 import random
-from utilities import get_path
+import re
+from pandas import pd
+from utilities.utilities import custom_tokenize_recipe
+from utilities.path_utilities import PATHS
 
 
-def format_raw_recipe_dataset():
+def format_raw_recipe_dataset(raw_recipes_path=PATHS['RAW_RECIPES'], 
+                              tokenized_recipes_path=PATHS['tokenized_recipes']):
     """
     This function formats the raw recipe dataset retrieved from
     https://www.kaggle.com/datasets/shuyangli94/food-com-recipes-and-user-interactions?resource=download&select=RAW_recipes.csv
     and tokenizes the recipes in the format desired by the model. [SEP] and [CLS] tokens are omitted. The new dataset is
     saved in the training_dataset folder under the name tokenized_recipes.csv.
     """
-    # Read the raw dataset
-    module_path = get_path('chef-jarvis')
-    training_data = pd.read_csv(os.path.join(module_path, 'training_dataset/RAW_recipes.csv'))
+    training_data = pd.read_csv(raw_recipes_path)
     # Remove the unnecessary columns from the dataset
     training_data.drop(['minutes', 'id', 'contributor_id', 'submitted', 'tags',
                         'nutrition', 'n_steps', 'description', 'n_ingredients'], axis=1, inplace=True)
@@ -34,7 +35,7 @@ def format_raw_recipe_dataset():
     training_data['tokenized'] = training_data.apply(lambda x: custom_tokenize_recipe(x.ingredients, x.steps), axis=1)
     print('Saving...')
     # Save the tokenized dataset
-    training_data.to_csv(os.path.join(module_path, 'training_dataset/tokenized_recipes.csv'))
+    training_data.to_csv(tokenized_recipes_path)
 
 
 def add_units_to_ingredients(ing_list):

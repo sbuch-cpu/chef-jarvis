@@ -13,10 +13,10 @@ processor = Wav2Vec2ProcessorWithLM.from_pretrained(hugging_face_mode)
 
 #  Text to speech
 #  simple google text to speech implementation
-def gTTS_model(myText):
+def gTTS_model(my_text):
     language = "en"
 
-    output = gTTS(text=myText, lang=language, slow=False)
+    output = gTTS(text=my_text, lang=language, slow=False)
 
     output.save("output.mp3")
 
@@ -24,19 +24,21 @@ def gTTS_model(myText):
 
     os.remove("output.mp3")
 
+
 #  SPEECH TO TEXT
 #  get audio from speech
 def speech_to_audio(question_time):
     fs = 16000  # Sample rate
     seconds = question_time  # Duration of recording
 
-    myrecording = sd.rec(int(seconds * fs), samplerate=fs, channels=1)
+    my_recording = sd.rec(int(seconds * fs), samplerate=fs, channels=1)
     print('recording')
     sd.wait()  # Wait until recording is finished
     print('done recording')
-    myrecording = myrecording.flatten()
-    myrecording = nr.reduce_noise(y=myrecording, sr=fs)
-    return audio_to_transcript(myrecording, sampling_rate=fs)
+    my_recording = my_recording.flatten()
+    my_recording = nr.reduce_noise(y=my_recording, sr=fs)
+    return audio_to_transcript(my_recording, sampling_rate=fs)
+
 
 #  Convert audio to text
 def audio_to_transcript(audio, sampling_rate=16000):
