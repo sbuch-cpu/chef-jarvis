@@ -1,5 +1,7 @@
 import os
 import json
+import time
+
 import pandas as pd
 from fine_tuning_data import get_path
 from distilbert_custom.distilBERT_attempt import get_model_and_tokenizer
@@ -11,6 +13,7 @@ from torch.utils.data import DataLoader
 from torch.utils.data import random_split
 from tqdm import tqdm
 
+
 # define class elsewhere?
 class Jarvis_Dataset(torch.utils.data.Dataset):
     def __init__(self, encodings):
@@ -21,6 +24,7 @@ class Jarvis_Dataset(torch.utils.data.Dataset):
 
     def __len__(self):
         return len(self.encodings.input_ids)
+
 
 def load_data_to_datasets():
     # Read the existing question set json file using the json module
@@ -39,7 +43,7 @@ def tokenize_data(questions_dataset, contexts_dataset):
     model, tokenizer = get_model_and_tokenizer()
 
     # take a random sample of 10 questions - just for testing purposes
-    questions_dataset = random.sample(questions_dataset, 10)
+    questions_dataset = random.sample(questions_dataset, 10000)
 
     # Get questions and context from datasets
     questions = [data['question'] for data in questions_dataset]
@@ -55,6 +59,8 @@ def tokenize_data(questions_dataset, contexts_dataset):
     with open('tokenized_data.pkl', 'wb') as file:
         # A new file will be created
         pickle.dump(data_encodings, file)
+    # return data_encodings, model, tokenizer
+
 
 def initialize_dataset():
     # Load tokenized data from pickle file
@@ -66,11 +72,13 @@ def initialize_dataset():
     with open('initialized_data.pkl', 'wb') as file:
         pickle.dump(dataset, file)
 
+
 def get_dataset_ready():
     # Get data ready for training and testing
     json_dataset, recipe_context = load_data_to_datasets()
     tokenize_data(json_dataset, recipe_context)
     initialize_dataset()
+
 
 def split_set():
     # Load initialized data from pickle file
@@ -84,6 +92,7 @@ def split_set():
     train_set, test_set = random_split(dataset, [train_size, test_size])
     return train_set, test_set
 
+
 def fine_tune(train_dataset):
     # Load DistilBERT model and tokenizer
     model, tokenizer = get_model_and_tokenizer()
@@ -96,7 +105,7 @@ def fine_tune(train_dataset):
     model.train()
     # initialize adam optimizer with weight decay (reduces chance of overfitting)
     optim = torch.optim.AdamW(model.parameters(), lr=5e-5)
-    #optim = AdamW(model.parameters(), lr=5e-5) OLD VERSION- new implementation above
+    # optim = AdamW(model.parameters(), lr=5e-5) OLD VERSION- new implementation above
 
     # initialize data loader for training data
     train_loader = DataLoader(train_dataset, batch_size=16, shuffle=True)
@@ -127,13 +136,53 @@ def fine_tune(train_dataset):
             # print relevant info to progress bar
             loop.set_description(f'Epoch {epoch}')
             loop.set_postfix(loss=loss.item())
+    # evaluate model on test set
+    test_dataset = split_set()[1]
+    test_loader = DataLoader(test_dataset, batch_size=16, shuffle=True)
+    # set model to eval mode
+    model.eval()
+    # setup loop (we use tqdm for the progress bar)
+    loop = tqdm(test_loader, leave=True)
+    for batch in loop:
+        # pull all the tensor batches required for training
+        input_ids = batch['input_ids'].to(device)
+        attention_mask = batch['attention_mask'].to(device)
+        start_positions = batch['start_positions'].to(device)
+        end_positions = batch['end_positions'].to(device)
+        # train model on batch and return outputs (incl. loss)
+        outputs = model(input_ids, attention_mask=attention_mask,
+                        start_positions=start_positions,
+                        end_positions=end_positions)
+        # extract loss
+        loss = outputs[0]
+        # print relevant info to progress bar
+        loop.set_description(f'Epoch {epoch}')
+        loop.set_postfix(loss=loss.item())
+    # save model
+    torch.save(model, 'model.pt')
+    # save tokenizer
+    torch.save(tokenizer, 'tokenizer.pt')
+    return model, tokenizer
 
 
 def main():
     # Uncomment first line to get data tokenized and saved to pickle file
-    # get_dataset_ready()
+    # Time get_dataset_ready()
+    start_time_first = time.time()
+    get_dataset_ready()
+    end_time = time.time()
+    print(f'Time taken to get dataset ready: {end_time - start_time_first} seconds')
+    # Time split_set()
+    start_time = time.time()
     train, test = split_set()
+    end_time = time.time()
+    print(f'Time taken to split dataset: {end_time - start_time} seconds')
+    # Time fine_tune(train)
+    start_time = time.time()
     fine_tune(train)
+    end_time_last = time.time()
+    print(f'Time taken to fine tune: {end_time_last - start_time} seconds')
+    print(f'Total time taken: {end_time_last - start_time_first} seconds')
 
 
 if __name__ == "__main__":
