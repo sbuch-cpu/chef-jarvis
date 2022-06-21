@@ -29,11 +29,48 @@ def get_step_number_question(tokenized_recipe, number_of_steps, recipe_index):
             start_index = step_start_index + 1
         else:
             start_index = step_item_indexes[step_number - 2] + 1
-        answer = ' '.join(indexable_list[start_index:end_index+1])
+        answer = ' '.join(indexable_list[start_index:end_index + 1])
         end_index -= 1
         json_formatted_dataset.append({'question': question,
                                        'answer': answer,
                                        'recipe_index': recipe_index,
                                        'start_index': start_index,
                                        'end_index': end_index})
+    return json_formatted_dataset
+
+
+def get_ingredient_from_step_question(method, ingredients, recipe_index, step_start_end_indexes, step_number):
+    json_formatted_dataset = []
+    ingredients_in_step = []
+    indexable_list = method.split()
+    # Split each item in the ingredients list into a list of words then flatten the list
+    flattented_ingredients = [ingredient.split() for ingredient in ingredients]
+    # indexable_list = [re.sub(r'[^\w\s]', '', i) for i in indexable_list]
+    print('##############################################################################')
+    print(ingredients)
+    print(indexable_list)
+    for ingredient in ingredients:
+        if len(ingredient.split()) == 1:
+            # If the ingredient is a single word, we can just search for it in the list
+            # ingredient_index = indexable_list.index(ingredient)
+            ingredient_index_options = [i for i, x in enumerate(indexable_list) if x == ingredient]
+        else:
+            ingredient_index_options = [i for i, x in enumerate(indexable_list) if x == ingredient.split()[0]]
+
+            # Check if any options are followed by the next word in the ingredient
+            ingredient_index_options_best = [i for i in ingredient_index_options if
+                                             indexable_list[i + 1] == ingredient.split()[1]]
+            if ingredient_index_options_best:
+                # Maybe keep iterating until we find the best match but add that later
+                ingredient_index_options = ingredient_index_options_best
+            # Check for any words in ingredient that only occur once in flattented_ingredients
+            searchable_words = [word for word in ingredient.split() if flattented_ingredients.count(word) == 1]
+            # add support to check that the word is an ingredient
+            # check for plural/nonplural version of the word
+            # Look for each searchable word in the method and extend the ingredient_index_options
+            for word in searchable_words:
+                ingredient_index_options.extend([i for i, x in enumerate(indexable_list) if x == word])
+        ingredients_in_step.extend(ingredient_index_options)
+    print(method)
+    print(ingredients_in_step)
     return json_formatted_dataset
