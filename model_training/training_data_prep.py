@@ -51,7 +51,9 @@ def tokenize_data(questions_dataset, contexts_dataset, size=1000,
     context_options = contexts_dataset['tokenized'].values
     contexts = [context_options[data['recipe_index']] for data in questions_dataset]
     # Tokenize questions and contexts
+    print("tokenizing...")
     data_encodings = tokenizer(questions, contexts, truncation=truncation, padding=padding)
+    print('Done Tokenizing...')
     # Add tokenized start and end positions to data_encodings
     start_positions = [data['start_index'] for data in questions_dataset]
     end_positions = [data['end_index'] for data in questions_dataset]
@@ -82,9 +84,7 @@ def split_set(test_split=0.2, initialized_data_path=PATHS['INITIALIZED_DATA']):
         dataset = pickle.load(file)
     # Split the dataset into training and validation sets using 80/20 split
     dataset_size = len(dataset)
-    print(dataset_size)
     test_size = int(test_split * dataset_size)
     train_size = dataset_size - test_size
     train_set, test_set = random_split(dataset, [train_size, test_size])
-    print(len(train_set), len(test_set))
     return train_set, test_set

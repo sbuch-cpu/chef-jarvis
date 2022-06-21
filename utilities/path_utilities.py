@@ -22,6 +22,6 @@ PATHS = {
     'TOKENIZED_RECIPES': construct_path('models_and_data/training_dataset/tokenized_recipes.csv'),
     'TOKENIZED_DATA': construct_path('models_and_data/datasplits/tokenized_data.pkl'),
     'INITIALIZED_DATA': construct_path('models_and_data/datasplits/initialized_data.pkl'),
-    'TRAINING_TRACKING': construct_path('models_and_data/training_params.csv'),
-    'MODEL': construct_path('models_and_data/distilbert-custom')
+    'TRAINING_PARAMS': construct_path('models_and_data/training_params.csv'),
+    'MODEL': construct_path('models_and_data/models')
 }

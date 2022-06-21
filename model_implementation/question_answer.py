@@ -1,3 +1,5 @@
+import os
+
 import torch
 from utilities.utilities import get_model_and_tokenizer, get_model_and_tokenizer_pretrained
 from utilities.path_utilities import PATHS
@@ -5,7 +7,7 @@ from utilities.path_utilities import PATHS
 
 def ask_distilBERT(question, context, test=False):
     if test:
-        return fine_tuned_distilBERT(question, context)
+        return fine_tuned_distilBERT(question, context, 'distilbert-custom-backward-AdamW-1000-0.2-20-5-t-p')
     else:
         return default_distilBERT(question, context)
 
@@ -25,7 +27,8 @@ def default_distilBERT(question, context):
     return tokenizer.decode(predict_answer_tokens)
 
 
-def fine_tuned_distilBERT(question, context, model_path=PATHS['MODEL']):
+def fine_tuned_distilBERT(question, context, model_name, model_dir_path=PATHS['MODEL']):
+    model_path = os.path.join(model_dir_path, model_name)
     model, tokenizer = get_model_and_tokenizer_pretrained(model_path)
 
     model.eval()
@@ -37,6 +40,6 @@ def fine_tuned_distilBERT(question, context, model_path=PATHS['MODEL']):
     answer_start_index = outputs.start_logits.argmax()
     answer_end_index = outputs.end_logits.argmax()
     # print(answer_start_index, answer_end_index)
-    predict_answer_tokens = inputs.input_ids[0, answer_end_index: answer_start_index + 1]
+    predict_answer_tokens = inputs.input_ids[0, answer_start_index: answer_end_index + 1]
     # print(predict_answer_tokens)
     return tokenizer.decode(predict_answer_tokens)

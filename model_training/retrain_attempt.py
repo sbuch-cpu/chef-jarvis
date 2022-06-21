@@ -1,5 +1,4 @@
 # WITH SOME CODE FROM https://towardsdatascience.com/how-to-fine-tune-a-q-a-transformer-86f91ec92997
-
 import os
 import pandas as pd
 from transformers import DistilBertForQuestionAnswering
@@ -9,7 +8,9 @@ from utilities.path_utilities import PATHS
 import torch
 from torch.utils.data import DataLoader
 from tqdm import tqdm
+import logging
 
+logging.getLogger('transformers').setLevel(logging.ERROR)
 
 def fine_tune(train_dataset, batch_size=16, num_epochs=3, loss_function='AdamW', optimizer='backward'):
     # Load DistilBERT model and tokenizer
@@ -62,7 +63,28 @@ def fine_tune(train_dataset, batch_size=16, num_epochs=3, loss_function='AdamW',
     return model, tokenizer
 
 
-def save_model(model, tokenizer, model_path=PATHS['MODEL']):
+def folder_name(params):
+    loss = params['loss_function']
+    optim = params['optimizer']
+    dataset_size = params['dataset_size']
+    split = params['test/train']
+    batch = params['batch_size']
+    epochs = params['num_epochs']
+    padd_check = params['padding']
+    trunc_check = params['truncation']
+    padd = ""
+    trunc = ""
+    if padd_check:
+        padd = 'p'
+    if trunc_check:
+        trunc = 't'
+    return loss, optim, dataset_size, split, batch, epochs, trunc, padd
+
+
+def save_model(model, tokenizer, params, model_path=PATHS['MODEL']):
+    loss, optim, dataset_size, split, batch, epochs, trunc, padd = folder_name(params)
+    file_name = f'distilbert-custom-{loss}-{optim}-{dataset_size}-{split}-{batch}-{epochs}-{trunc}-{padd}'
+    model_path = os.path.join(model_path, file_name)
     if not os.path.exists(model_path):
         os.makedirs(model_path)
     # Save the model
@@ -102,11 +124,11 @@ def test_model_accuracy(test_set, path, batch_size=16):
             acc.append(((end_pred == end_true).sum() / len(end_pred)).item())
     # calculate average accuracy in total
     acc = sum(acc) / len(acc)
-    print(f'Model Accuracy = {acc * 100}%')
-    return acc
+    print(f'Model Accuracy = {round(acc * 100, 2)}%')
+    return round(acc,6)
 
 
-def main(training_params, new_dataset=False, training_tracking_path=PATHS['TRAINING_TRACKING']):
+def train_model(training_params, new_dataset=False, training_params_path=PATHS['TRAINING_PARAMS']):
     if new_dataset:
         get_dataset_ready(size=training_params['dataset_size'],
                           truncation=training_params['truncation'],
@@ -120,34 +142,30 @@ def main(training_params, new_dataset=False, training_tracking_path=PATHS['TRAIN
                                                  num_epochs=training_params['num_epochs'],
                                                  loss_function=training_params['loss_function'],
                                                  optimizer=training_params['optimizer'])
-    pretrained_path = save_model(trained_model, trained_tokenizer)
+    pretrained_path = save_model(trained_model, trained_tokenizer, training_params)
     training_params['accuracy'] = test_model_accuracy(test,
                                                       pretrained_path,
                                                       batch_size=training_params['batch_size'])
-    if os.path.exists(training_tracking_path):
-        training_tracking = pd.read_csv(training_tracking_path, index_col=0)
+    if os.path.exists(training_params_path):
+        training_tracking = pd.read_csv(training_params_path, index_col=0)
     else:
         training_tracking = pd.DataFrame(columns=training_params.keys())
     new_row_params = {k: [v] for k, v in training_params.items()}
-    print(new_row_params)
     new_row = pd.DataFrame(new_row_params, columns=training_params.keys())
-    print(new_row)
     training_tracking = pd.concat([training_tracking, new_row])
     training_tracking.reset_index(inplace=True, drop=True)
-    print(training_tracking)
-    training_tracking.to_csv(training_tracking_path)
+    training_tracking.to_csv(training_params_path)
 
 
 if __name__ == "__main__":
     training_information = {
-        'dataset_size': 200,
-        'test/train': 0.2,
-        'batch_size': 10,
-        'num_epochs': 5,
+        'dataset_size': 1000,
+        'test/train': 0.3,
+        'batch_size': 20,
+        'num_epochs': 7,
         'truncation': True,
         'padding': True,
         'loss_function': 'backward',
-        'optimizer': 'AdamW',
-        'accuracy': None
+        'optimizer': 'AdamW'
     }
-    main(training_information, new_dataset=True)
+    train_model(training_information, new_dataset=True)
