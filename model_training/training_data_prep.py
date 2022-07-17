@@ -49,15 +49,43 @@ def tokenize_data(questions_dataset, contexts_dataset, size=1000,
     # Get questions and context from datasets
     questions = [data['question'] for data in questions_dataset]
     context_options = contexts_dataset['tokenized'].values
+    answers = []
+    for idx, data in enumerate(questions_dataset):
+        tokenized_answer = tokenizer(context_options[data['start_index']:data['end_index']][0], '').input_ids[1:-2]
+        answers.append(tokenized_answer)
+    # answers =
+    # answer_tokenized =
     contexts = [context_options[data['recipe_index']] for data in questions_dataset]
+
     # Tokenize questions and contexts
     print("tokenizing...")
     data_encodings = tokenizer(questions, contexts, truncation=truncation, padding=padding)
+    inputs = data_encodings.input_ids
+    masks = []
+    start_positions = []
+    end_positions = []
+    for idx, input in enumerate(inputs):
+        answer_start_list = [i for i, elem in enumerate(input) if elem == answers[idx][0]]
+        if len(answer_start_list) != 1:
+            for i in range(len(answer_start_list)):
+                if answer_start_list[i] < questions_dataset[idx]['start_index']:
+                    del answer_start_list[i]
+        iterator = 1
+        # check_list = answer_start_list.copy()
+        while len(answer_start_list) != 1:
+            answer_start_list = [i for i in answer_start_list if input[i+iterator] == answers[idx][iterator]]
+            iterator += 1
+        answer_start = answer_start_list[0]
+        print(input[answer_start:answer_start + len(answers[idx])])
+        start_positions.append(answer_start)
+        end_positions.append(answer_start + len(answers[idx]))
+
     print('Done Tokenizing...')
     # Add tokenized start and end positions to data_encodings
     start_positions = [data['start_index'] for data in questions_dataset]
     end_positions = [data['end_index'] for data in questions_dataset]
     data_encodings.update({'start_positions': start_positions, 'end_positions': end_positions})
+
     # Save tokenized data to pickle file
     with open(tokenized_data_path, 'wb') as file:
         # A new file will be created
@@ -66,7 +94,6 @@ def tokenize_data(questions_dataset, contexts_dataset, size=1000,
 
 
 def initialize_dataset(tokenized_data_path=PATHS['TOKENIZED_DATA'], initialized_data_path=PATHS['INITIALIZED_DATA']):
-
     # Load tokenized data from pickle file
     with open(tokenized_data_path, 'rb') as file:
         data_encodings = pickle.load(file)
@@ -78,7 +105,6 @@ def initialize_dataset(tokenized_data_path=PATHS['TOKENIZED_DATA'], initialized_
 
 
 def split_set(test_split=0.2, initialized_data_path=PATHS['INITIALIZED_DATA']):
-
     # Load initialized data from pickle file
     with open(initialized_data_path, 'rb') as file:
         dataset = pickle.load(file)

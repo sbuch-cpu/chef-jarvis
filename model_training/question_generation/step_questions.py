@@ -2,10 +2,6 @@ import random
 from utilities.utilities import get_indexable_list
 
 
-def generate_steps_question(tokenized_recipe, recipe_index):
-    number_of_steps = 1
-
-
 def get_step_number_question(tokenized_recipe, number_of_steps, recipe_index):
     json_formatted_dataset = []
     questions = []

@@ -1,5 +1,7 @@
 # WITH SOME CODE FROM https://towardsdatascience.com/how-to-fine-tune-a-q-a-transformer-86f91ec92997
 import os
+import time
+
 import pandas as pd
 from transformers import DistilBertForQuestionAnswering
 from model_training.training_data_prep import get_dataset_ready, split_set
@@ -9,8 +11,10 @@ import torch
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 import logging
+import pickle
 
 logging.getLogger('transformers').setLevel(logging.ERROR)
+
 
 def fine_tune(train_dataset, batch_size=16, num_epochs=3, loss_function='AdamW', optimizer='backward'):
     # Load DistilBERT model and tokenizer
@@ -125,14 +129,17 @@ def test_model_accuracy(test_set, path, batch_size=16):
     # calculate average accuracy in total
     acc = sum(acc) / len(acc)
     print(f'Model Accuracy = {round(acc * 100, 2)}%')
-    return round(acc,6)
+    return round(acc, 6)
 
 
 def train_model(training_params, new_dataset=False, training_params_path=PATHS['TRAINING_PARAMS']):
     if new_dataset:
+        start_time = time.time()
         get_dataset_ready(size=training_params['dataset_size'],
                           truncation=training_params['truncation'],
                           padding=training_params['padding'])
+        end_time = time.time()
+        print(f'Time taken = {round(end_time - start_time, 5)}')
 
     train, test = split_set(training_params['test/train'])
     if not new_dataset:
@@ -157,10 +164,32 @@ def train_model(training_params, new_dataset=False, training_params_path=PATHS['
     training_tracking.to_csv(training_params_path)
 
 
+def breakup_tokenized(path=PATHS['BROKEN_TOKENIZED'], max_length=100000):
+    with open(PATHS['TOKENIZED_DATA'], 'rb') as file:
+        tokenized = pickle.load(file)
+    keys = list(tokenized.keys())
+    overall_length = len(tokenized[keys[0]])
+    current_position = 0
+    split_number = 0
+    while current_position < overall_length:
+        end_position = current_position + max_length
+        split_tokenized = {}
+        for key in keys:
+            if end_position >= overall_length:
+                split_tokenized[key] = tokenized[key][current_position:]
+            else:
+                split_tokenized[key] = tokenized[key][current_position:end_position]
+        split_tokenized_path = os.path.join(path, f'tokenized_data_{split_number}.pkl')
+        with open(split_tokenized_path, 'wb') as file:
+            pickle.dump(split_tokenized, file)
+        split_number += 1
+        current_position = end_position
+
+
 if __name__ == "__main__":
     training_information = {
-        'dataset_size': 1000,
-        'test/train': 0.3,
+        'dataset_size': 5,
+        'test/train': 0.2,
         'batch_size': 20,
         'num_epochs': 7,
         'truncation': True,
@@ -169,3 +198,4 @@ if __name__ == "__main__":
         'optimizer': 'AdamW'
     }
     train_model(training_information, new_dataset=True)
+    # breakup_tokenized()

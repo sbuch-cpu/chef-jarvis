@@ -1,6 +1,6 @@
 import random
 import re
-from pandas import pd
+import pandas as pd
 from utilities.utilities import custom_tokenize_recipe
 from utilities.path_utilities import PATHS
 

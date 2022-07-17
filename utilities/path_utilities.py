@@ -20,8 +20,9 @@ PATHS = {
     'QUESTION_SET': construct_path('models_and_data/training_dataset/question_set.json'),
     'RAW_RECIPES': construct_path('models_and_data/training_dataset/RAW_recipes.csv'),
     'TOKENIZED_RECIPES': construct_path('models_and_data/training_dataset/tokenized_recipes.csv'),
-    'TOKENIZED_DATA': construct_path('models_and_data/datasplits/tokenized_data.pkl'),
+    'TOKENIZED_DATA': construct_path('models_and_data/datasplits_2milli/tokenized_data.pkl'),
     'INITIALIZED_DATA': construct_path('models_and_data/datasplits/initialized_data.pkl'),
     'TRAINING_PARAMS': construct_path('models_and_data/training_params.csv'),
-    'MODEL': construct_path('models_and_data/models')
+    'MODEL': construct_path('models_and_data/models'),
+    'BROKEN_TOKENIZED': construct_path('models_and_data/tokenized_broken')
 }
