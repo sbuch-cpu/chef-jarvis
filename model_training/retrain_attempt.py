@@ -188,7 +188,7 @@ def breakup_tokenized(path=PATHS['BROKEN_TOKENIZED'], max_length=100000):
 
 if __name__ == "__main__":
     training_information = {
-        'dataset_size': 5,
+        'dataset_size': 1000,
         'test/train': 0.2,
         'batch_size': 20,
         'num_epochs': 7,

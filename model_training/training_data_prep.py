@@ -49,34 +49,34 @@ def tokenize_data(questions_dataset, contexts_dataset, size=1000,
     # Get questions and context from datasets
     questions = [data['question'] for data in questions_dataset]
     context_options = contexts_dataset['tokenized'].values
+    contexts = [context_options[data['recipe_index']] for data in questions_dataset]
+
     answers = []
     for idx, data in enumerate(questions_dataset):
-        tokenized_answer = tokenizer(context_options[data['start_index']:data['end_index']][0], '').input_ids[1:-2]
+        tokenized_answer = tokenizer(data['answer'], '').input_ids[1:-2]
         answers.append(tokenized_answer)
-    # answers =
-    # answer_tokenized =
-    contexts = [context_options[data['recipe_index']] for data in questions_dataset]
 
     # Tokenize questions and contexts
     print("tokenizing...")
     data_encodings = tokenizer(questions, contexts, truncation=truncation, padding=padding)
     inputs = data_encodings.input_ids
-    masks = []
     start_positions = []
     end_positions = []
     for idx, input in enumerate(inputs):
         answer_start_list = [i for i, elem in enumerate(input) if elem == answers[idx][0]]
-        if len(answer_start_list) != 1:
-            for i in range(len(answer_start_list)):
-                if answer_start_list[i] < questions_dataset[idx]['start_index']:
-                    del answer_start_list[i]
         iterator = 1
-        # check_list = answer_start_list.copy()
-        while len(answer_start_list) != 1:
-            answer_start_list = [i for i in answer_start_list if input[i+iterator] == answers[idx][iterator]]
+        while len(answer_start_list) > 1:
+            if iterator == len(answers[idx]):
+                break
+            answer_start_list = [i for i in answer_start_list if input[i + iterator] == answers[idx][iterator]]
+            if iterator > 100:
+                raise Exception
             iterator += 1
         answer_start = answer_start_list[0]
-        print(input[answer_start:answer_start + len(answers[idx])])
+        # print("DECODED INPUT: ", tokenizer.decode(input))
+        # print("QUESTION: ", questions[idx])
+        # print("ANSWER: ", tokenizer.decode(answers[idx]))
+        # print("DECODED ANSWER: ", tokenizer.decode(input[answer_start:answer_start + len(answers[idx])]))
         start_positions.append(answer_start)
         end_positions.append(answer_start + len(answers[idx]))
 
